@@ -75,6 +75,8 @@ private:
 
 	int getHoverCell(const QPoint &mousePos) const;
 	int getHoverText(const QPoint &mousePos) const;
+	int lineNumberDigitsCount() const;
+	int lineNumberWidth() const;
 };
 
 #endif // HEXVIEW_H

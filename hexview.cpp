@@ -21,7 +21,7 @@ static QColor hoverTextColor("#ff0000");
 static QColor selectedColor("#0000ff");
 static QColor selectedTextColor("#000000");
 
-#define cellX(x) ((x) * m_cellSize + ((x) + 1 + ((x) / 8)) * m_cellPadding)
+#define cellX(x) (lineNumberWidth() + (x) * m_cellSize + ((x) + 1 + ((x) / 8)) * m_cellPadding)
 #define textX(x) (cellX(m_bytesPerLine + 1) + x * (m_characterWidth + 5))
 
 static const char hexTable[16] = {'0', '1', '2', '3', '4', '5', '6', '7',
@@ -159,6 +159,7 @@ void HexView::setEditor(BufferedEditor *editor)
 	m_editor = editor;
 	m_verticalScrollBar->setRange(0, int(rowCount() - 1)); // TODO: qint64
 	setVerticalScrollPosition(0);
+	setFixedWidth(textX(m_bytesPerLine) + m_cellPadding + m_verticalScrollBar->width());
 	// TODO: clear selection
 }
 
@@ -202,6 +203,9 @@ void HexView::paintEvent(QPaintEvent *event)
 	int i = startY * m_bytesPerLine;
 	m_editor->seek(i);
 	for (int y = startY, yCoord = m_cellSize; i < m_editor->size() && y < endY; ++y, yCoord += cellHeight) {
+		painter.drawText(QPointF(m_cellSize / 2, yCoord),
+						 QString::number(m_editor->position(), 16).rightJustified(lineNumberDigitsCount(), '0'));
+
 		for (int x = 0; i < m_editor->size() && x < m_bytesPerLine; ++x, ++i) {
 			unsigned char byte = static_cast<unsigned char>(m_editor->getByte());
 			cellText[0] = hexTable[(byte >> 4) & 0xF];
@@ -416,6 +420,8 @@ int HexView::getHoverCell(const QPoint &mousePos) const
 	int x = mousePos.x();
 	int y = mousePos.y();
 
+	x -= lineNumberWidth();
+
 	{
 		int vx = x;
 		while (vx > 8 * m_cellPadding + 8 * m_cellSize) {
@@ -464,4 +470,21 @@ int HexView::getHoverText(const QPoint &mousePos) const
 		return xi + m_bytesPerLine * yi;
 
 	return -1;
+}
+
+int HexView::lineNumberDigitsCount() const
+{
+	if (m_editor == nullptr)
+		return 0;
+
+	int digits = 1;
+	qint64 size = m_editor->size();
+	while (size /= 16)
+		++digits;
+	return digits;
+}
+
+int HexView::lineNumberWidth() const
+{
+	return m_cellSize + lineNumberDigitsCount() * m_characterWidth;
 }
