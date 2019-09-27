@@ -9,6 +9,11 @@
 #include <QAction>
 #include <QClipboard>
 #include <QGuiApplication>
+#include <QApplication>
+#include <QStyle>
+#include <QScrollBar>
+
+#include <QDebug>
 
 static QColor backgroundColor("#ffffff");
 static QColor textColor("#000000");
@@ -39,7 +44,13 @@ HexView::HexView(QWidget *parent)
 	, m_selectionEnd(-1)
 	, m_selection(Selection::None)
 	, m_selecting(false)
+	, m_editor(nullptr)
+	, m_verticalScrollBar(new QScrollBar(this))
+	, m_scrollTopRow(0)
 {
+	m_verticalScrollBar->resize(QApplication::style()->pixelMetric(QStyle::PM_ScrollBarExtent), height());
+	connect(m_verticalScrollBar, &QAbstractSlider::valueChanged, this, &HexView::setVerticalScrollPosition);
+
 	QPalette pal = palette();
 	backgroundColor = pal.base().color();
 	textColor = pal.text().color();
@@ -50,7 +61,7 @@ HexView::HexView(QWidget *parent)
 	pal.setColor(QPalette::Window, backgroundColor);
 	setAutoFillBackground(true);
 	setPalette(pal);
-	setFixedWidth(textX(m_bytesPerLine) + m_cellPadding);
+	setFixedWidth(textX(m_bytesPerLine) + m_cellPadding + m_verticalScrollBar->width());
 	setMinimumHeight(80);
 	setMouseTracking(true);
 }
@@ -58,14 +69,14 @@ HexView::HexView(QWidget *parent)
 QString HexView::toPlainText() const
 {
 	QString s;
-	if (m_data.isEmpty())
+	if (m_editor->isEmpty())
 		return s;
 
 	QString byte = "FF ";
-	int i = 0;
-	while (i < m_data.size()) {
-		for (int x = 0; i < m_data.size() && x < m_bytesPerLine; ++x, ++i) {
-			unsigned char b = static_cast<unsigned char>(m_data[i]);
+	m_editor->seek(0);
+	while (!m_editor->atEnd()) {
+		for (int x = 0; !m_editor->atEnd() && x < m_bytesPerLine; ++x) {
+			unsigned char b = static_cast<unsigned char>(m_editor->getByte());
 			byte[0] = hexTable[(b >> 4) & 0xF];
 			byte[1] = hexTable[(b >> 0) & 0xF];
 			s.append(byte);
@@ -93,38 +104,14 @@ std::optional<HexView::ByteSelection> HexView::selection() const
 	return ByteSelection(s, e - s + 1);
 }
 
-void HexView::clear()
+qint64 HexView::rowCount() const
 {
-	m_data.clear();
-
-	int rows = m_data.size() / m_bytesPerLine + (m_data.size() % m_bytesPerLine > 0);
-	int widgetHeight = rows * m_cellSize + (rows + 1) * m_cellPadding;
-	if (widgetHeight != height())
-		resize(width(), widgetHeight);
-
-	repaint();
-}
-
-void HexView::setData(const QByteArray &data)
-{
-	m_data.clear();
-	insertData(data);
-}
-
-void HexView::insertData(const QByteArray &data)
-{
-	m_data.append(data);
-
-	int rows = m_data.size() / m_bytesPerLine + (m_data.size() % m_bytesPerLine > 0);
-	int widgetHeight = rows * m_cellSize + (rows + 1) * m_cellPadding;
-	if (widgetHeight != height())
-		resize(width(), widgetHeight);
-
-	repaint();
+	return m_editor->size() / m_bytesPerLine + (m_editor->size() % m_bytesPerLine > 0);
 }
 
 void HexView::setBytesPerLine(int bytesPerLine)
 {
+	/*
 	m_bytesPerLine = bytesPerLine;
 
 	setFixedWidth(textX(m_bytesPerLine) + m_cellPadding);
@@ -133,6 +120,7 @@ void HexView::setBytesPerLine(int bytesPerLine)
 	if (widgetHeight != height())
 		resize(width(), widgetHeight);
 	repaint();
+	*/
 }
 
 void HexView::highlight(ByteSelection selection)
@@ -166,14 +154,33 @@ void HexView::setFont(QFont font)
 	repaint();
 }
 
+void HexView::setEditor(BufferedEditor *editor)
+{
+	m_editor = editor;
+	m_verticalScrollBar->setRange(0, int(rowCount() - 1)); // TODO: qint64
+	setVerticalScrollPosition(0);
+	// TODO: clear selection
+}
+
+void HexView::setVerticalScrollPosition(int topRow)
+{
+	topRow = qBound(0, topRow, int(rowCount())); // TODO: qint64
+	m_verticalScrollBar->setValue(topRow);
+	m_scrollTopRow = topRow;
+
+	repaint();
+}
+
 void HexView::paintEvent(QPaintEvent *event)
 {
 	QPainter painter(this);
 
 	painter.setFont(m_font);
 
-	const int startY = qMax(0, event->rect().y() / (m_cellSize + m_cellPadding) - 1);
-	const int endY = qMin(m_data.size(), event->rect().bottom() / (m_cellSize + m_cellPadding) + 1);
+	const int cellHeight = m_cellSize + m_cellPadding;
+
+	const int startY = qMax(0, (event->rect().y() + cellHeight * int(m_scrollTopRow)) / cellHeight); // TODO: qint64
+	const int endY = qMin(int(m_editor->size()), (event->rect().bottom() + cellHeight * int(m_scrollTopRow)) / cellHeight + 1); // TODO: qint64
 
 	int selectionStart = -1;
 	int selectionEnd = -1;
@@ -193,14 +200,13 @@ void HexView::paintEvent(QPaintEvent *event)
 	QString cellText = "FF";
 	QString ch = "a";
 	int i = startY * m_bytesPerLine;
-	for (int y = startY; i < m_data.size() && y < endY; ++y) {
-		for (int x = 0; i < m_data.size() && x < m_bytesPerLine; ++x, ++i) {
-			unsigned char byte = static_cast<unsigned char>(m_data[i]);
+	m_editor->seek(i);
+	for (int y = startY, yCoord = m_cellSize; i < m_editor->size() && y < endY; ++y, yCoord += cellHeight) {
+		for (int x = 0; i < m_editor->size() && x < m_bytesPerLine; ++x, ++i) {
+			unsigned char byte = static_cast<unsigned char>(m_editor->getByte());
 			cellText[0] = hexTable[(byte >> 4) & 0xF];
 			cellText[1] = hexTable[(byte >> 0) & 0xF];
 			ch[0] = (byte >= 32 && byte <= 126) ? char(byte) : '.';
-
-			int yCoord = y * (m_cellSize + m_cellPadding) + m_cellSize;
 
 			QPoint cellCoord;
 			cellCoord.setX(cellX(x));
@@ -242,6 +248,14 @@ void HexView::paintEvent(QPaintEvent *event)
 			painter.drawText(textCoord, ch);
 		}
 	}
+}
+
+void HexView::resizeEvent(QResizeEvent *)
+{
+	// TODO
+
+	m_verticalScrollBar->move(width() - m_verticalScrollBar->width(), 0);
+	m_verticalScrollBar->resize(m_verticalScrollBar->width(), height());
 }
 
 void HexView::mouseMoveEvent(QMouseEvent *event)
@@ -290,8 +304,8 @@ void HexView::mousePressEvent(QMouseEvent *event)
 				selectionEnd = m_selectionStart + m_bytesPerLine;
 			}
 		}
-		if (selectionEnd > m_data.size())
-			selectionEnd = m_data.size();
+		if (selectionEnd > m_editor->size())
+			selectionEnd = m_editor->size();
 
 		QMenu menu(this);
 		QAction copyTextAction("Copy text");
@@ -313,7 +327,7 @@ void HexView::mousePressEvent(QMouseEvent *event)
 		bool hasSelection = (selectionStart < selectionEnd);
 		copyTextAction.setEnabled(hasSelection);
 		copyHexAction.setEnabled(hasSelection);
-		selectAllAction.setEnabled(!m_data.isEmpty());
+		selectAllAction.setEnabled(!m_editor->isEmpty());
 		selectNoneAction.setEnabled(hasSelection);
 		highlightInTextViewAction.setEnabled(hasSelection);
 
@@ -321,8 +335,9 @@ void HexView::mousePressEvent(QMouseEvent *event)
 
 		if (a == &copyTextAction) {
 			QString s;
-			for (int i = selectionStart; i < selectionEnd; ++i) {
-				char b = m_data[i];
+			m_editor->seek(selectionStart);
+			while (m_editor->position() < selectionEnd) {
+				char b = m_editor->getByte();
 				s.append((b >= 32 && b <= 126) ? b : '.');
 			}
 			QClipboard *clipboard = QGuiApplication::clipboard();
@@ -330,8 +345,9 @@ void HexView::mousePressEvent(QMouseEvent *event)
 		} else if (a == &copyHexAction) {
 			QString cell = "00 ";
 			QString s;
-			for (int i = selectionStart; i < selectionEnd; ++i) {
-				unsigned char byte = static_cast<unsigned char>(m_data[i]);
+			m_editor->seek(selectionStart);
+			while (m_editor->position() < selectionEnd) {
+				unsigned char byte = static_cast<unsigned char>(m_editor->getByte());
 				cell[0] = hexTable[(byte >> 4) & 0xF];
 				cell[1] = hexTable[(byte >> 0) & 0xF];
 				s.append(cell);
@@ -341,7 +357,7 @@ void HexView::mousePressEvent(QMouseEvent *event)
 			clipboard->setText(s);
 		} else if (a == &selectAllAction) {
 			m_selectionStart = 0;
-			m_selectionEnd = m_data.size() - 1;
+			m_selectionEnd = m_editor->size() - 1;
 			m_selection = Selection::Cells;
 			m_selecting = false;
 			repaint();
@@ -412,13 +428,15 @@ int HexView::getHoverCell(const QPoint &mousePos) const
 	x -= m_cellPadding / 2;
 	y -= m_cellPadding / 2;
 
+	y += (m_cellPadding + m_cellSize) * m_scrollTopRow;
+
 	int xi = -1;
 	int yi = -1;
 
 	if (x >= 0 && x < m_bytesPerLine * (m_cellPadding + m_cellSize))
 		xi = x / (m_cellPadding + m_cellSize);
 
-	if (y >= 0 && y < m_data.size() * (m_cellPadding + m_cellSize))
+	if (y >= 0 && y < m_editor->size() * (m_cellPadding + m_cellSize))
 		yi = y / (m_cellPadding + m_cellSize);
 
 	if (xi != -1 && yi != -1)
@@ -432,12 +450,14 @@ int HexView::getHoverText(const QPoint &mousePos) const
 	int x = mousePos.x();
 	int y = mousePos.y();
 
+	y += (m_cellPadding + m_cellSize) * m_scrollTopRow;
+
 	x -= cellX(m_bytesPerLine + 1);
 
 	int xi = -1, yi = -2;
 	if (x >= 0 && x < (m_characterWidth + 5) * m_bytesPerLine)
 		xi = x / (m_characterWidth + 5);
-	if (y >= 0 && y < m_data.size() * (m_cellPadding + m_cellSize))
+	if (y >= 0 && y < m_editor->size() * (m_cellPadding + m_cellSize))
 		yi = y / (m_cellPadding + m_cellSize);
 
 	if (xi != -1 && yi != -1)

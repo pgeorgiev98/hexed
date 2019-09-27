@@ -17,10 +17,12 @@ DEFINES += QT_DEPRECATED_WARNINGS
 CONFIG += c++17
 
 SOURCES += \
+        bufferededitor.cpp \
         hexview.cpp \
         main.cpp
 
 HEADERS += \
+        bufferededitor.h \
         hexview.h
 
 # Default rules for deployment.
