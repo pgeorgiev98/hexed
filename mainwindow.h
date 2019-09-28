@@ -6,6 +6,8 @@
 #include <QMainWindow>
 #include <QFile>
 
+#include <memory>
+
 class HexView;
 
 class MainWindow : public QMainWindow
@@ -20,7 +22,7 @@ public slots:
 private:
 	HexView *m_hexView;
 	QFile m_file;
-	BufferedEditor m_editor;
+	std::shared_ptr<BufferedEditor> m_editor;
 };
 
 #endif // MAINWINDOW_H

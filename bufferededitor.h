@@ -16,6 +16,7 @@ public:
 	bool isEmpty() const;
 	bool atEnd() const;
 	char getByte();
+	void putByte(char byte);
 
 private:
 	static const int sectionSize = 64;
@@ -24,8 +25,18 @@ private:
 	{
 		char data[sectionSize];
 		int length;
+		int modificationCount;
 
-		Section() : length(0) {}
+		Section() : length(0), modificationCount(0) {}
+	};
+
+	struct Modification
+	{
+		char before, after;
+		int sectionIndex;
+
+		Modification(char before, char after, int sectionIndex)
+			: before(before), after(after), sectionIndex(sectionIndex) {}
 	};
 
 	QIODevice *m_device;
@@ -34,8 +45,11 @@ private:
 	int m_localPosition;
 	qint64 m_absolutePosition;
 	QMap<int, Section>::iterator m_section;
+	QVector<Modification> m_modifications;
+	qint64 m_size;
 
 	QMap<int, Section>::iterator loadSection(int sectionIndex);
+	QMap<int, Section>::iterator getSection(int sectionIndex);
 };
 
 #endif // BUFFEREDEDITOR_H

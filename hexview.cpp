@@ -4,6 +4,7 @@
 #include <QPaintEvent>
 #include <QMouseEvent>
 #include <QWheelEvent>
+#include <QKeyEvent>
 #include <QtGlobal>
 #include <QFontDatabase>
 #include <QMenu>
@@ -51,6 +52,8 @@ HexView::HexView(QWidget *parent)
 	, m_verticalScrollBar(new QScrollBar(this))
 	, m_scrollTopRow(0)
 	, m_mouseScrollBuffer(0.0)
+	, m_editingCell(-1)
+	, m_editingCellByte(0x00)
 {
 	m_verticalScrollBar->resize(QApplication::style()->pixelMetric(QStyle::PM_ScrollBarExtent), height());
 	connect(m_verticalScrollBar, &QAbstractSlider::valueChanged, this, &HexView::setVerticalScrollPosition);
@@ -69,6 +72,7 @@ HexView::HexView(QWidget *parent)
 	setFixedWidth(textX(m_bytesPerLine) + m_cellPadding + m_verticalScrollBar->width());
 	setMinimumHeight(80);
 	setMouseTracking(true);
+	setFocusPolicy(Qt::WheelFocus);
 }
 
 QString HexView::toPlainText() const
@@ -245,15 +249,19 @@ void HexView::paintEvent(QPaintEvent *event)
 				else
 					painter.setPen(selectedColor);
 
-				painter.drawRect(cellCoord.x() - m_cellPadding / 2,
-								 cellCoord.y() - m_fontMetrics.ascent() - m_cellPadding / 2,
-								 m_characterWidth * 2 + m_cellPadding,
-								 m_cellSize + m_cellPadding - 1);
-
 				painter.drawRect(textCoord.x() - 2,
 								 textCoord.y() - m_fontMetrics.ascent() - 2,
 								 m_characterWidth + 4,
 								 m_fontMetrics.height() + 4);
+
+				if (m_editingCell == i) {
+					painter.setPen(textColor);
+					painter.setBrush(backgroundColor);
+				}
+				painter.drawRect(cellCoord.x() - m_cellPadding / 2,
+								 cellCoord.y() - m_fontMetrics.ascent() - m_cellPadding / 2,
+								 m_characterWidth * 2 + m_cellPadding,
+								 m_cellSize + m_cellPadding - 1);
 			}
 
 			if (m_hoveredIndex == i)
@@ -261,7 +269,11 @@ void HexView::paintEvent(QPaintEvent *event)
 			else
 				painter.setPen(textColor);
 
-			painter.drawText(cellCoord, cellText);
+			if (m_editingCell != i)
+				painter.drawText(cellCoord, cellText);
+			else
+				painter.drawText(cellCoord.x() + m_characterWidth / 2, cellCoord.y(),
+								 QString::number(m_editingCellByte, 16).toUpper());
 			painter.drawText(textCoord, ch);
 		}
 	}
@@ -306,6 +318,8 @@ void HexView::mouseMoveEvent(QMouseEvent *event)
 
 void HexView::mousePressEvent(QMouseEvent *event)
 {
+	m_editingCell = -1;
+
 	if (event->button() == Qt::RightButton) {
 		int selectionStart = -1;
 		int selectionEnd = -1;
@@ -401,6 +415,8 @@ void HexView::mouseReleaseEvent(QMouseEvent *)
 
 void HexView::mouseDoubleClickEvent(QMouseEvent *event)
 {
+	m_editingCell = -1;
+
 	int hoverCellIndex = getHoverCell(event->pos());
 	int hoverTextIndex = getHoverText(event->pos());
 	int newIndex = qMax(hoverCellIndex, hoverTextIndex);
@@ -435,6 +451,93 @@ void HexView::wheelEvent(QWheelEvent *event)
 			setVerticalScrollPosition(newTopRow);
 		}
 	}
+}
+
+void HexView::keyPressEvent(QKeyEvent *event)
+{
+	if (m_selecting || m_selectionStart != m_selectionEnd) {
+		QWidget::keyPressEvent(event);
+		return;
+	}
+
+	int key = event->key();
+	static const QSet<int> hexDigits = {
+		'0', '1', '2', '3', '4', '5', '6', '7', '8', '9',
+		'A', 'B', 'C', 'D', 'E', 'F',
+	};
+	bool keyIsHexDigit = hexDigits.contains(key);
+	auto putByte = [this]() {
+		m_editor->seek(m_editingCell);
+		m_editor->putByte(m_editingCellByte);
+		m_editingCell = -1;
+	};
+
+	static const QSet<int> movingKeys = {
+		Qt::Key_Enter, Qt::Key_Tab,
+		Qt::Key_Up, Qt::Key_Down, Qt::Key_Left, Qt::Key_Right,
+	};
+
+	if (m_selection == Selection::Cells) {
+		if (keyIsHexDigit) {
+			if (m_editingCell == -1) {
+				m_editingCell = m_selectionStart;
+				m_editingCellByte = char(QString(char(key)).toInt(nullptr, 16));
+				repaint();
+				return;
+			} else {
+				m_editingCellByte <<= 4;
+				m_editingCellByte |= char(QString(char(key)).toInt(nullptr, 16));
+				putByte();
+				++m_selectionStart;
+				++m_selectionEnd;
+				repaint();
+				return;
+			}
+		} else if (key == Qt::Key_Escape) {
+			if (m_editingCell != -1) {
+				m_editingCell = -1;
+				repaint();
+				return;
+			}
+		}
+	} else if (m_selection == Selection::Text) {
+		QString text = event->text();
+		if (text.size() == 1) {
+			char byte = text[0].toLatin1();
+			if (byte >= 32 && byte < 127) {
+				m_editor->seek(m_selectionStart);
+				m_editor->putByte(byte);
+				++m_selectionStart;
+				++m_selectionEnd;
+				repaint();
+				return;
+			}
+		}
+	}
+
+	if (movingKeys.contains(key)) {
+		if (m_editingCell != -1)
+			putByte();
+		int move = 0;
+		switch (key) {
+		case Qt::Key_Enter:
+		case Qt::Key_Tab:
+		case Qt::Key_Right:
+			move = 1; break;
+		case Qt::Key_Left:
+			move = -1; break;
+		case Qt::Key_Up:
+			move = -m_bytesPerLine; break;
+		case Qt::Key_Down:
+			move = m_bytesPerLine; break;
+		}
+		m_selectionStart = qBound(0, m_selectionStart + move, int(m_editor->size() - 1)); // TODO: qint64
+		m_selectionEnd = m_selectionStart;
+		repaint();
+		return;
+	}
+
+	QWidget::keyPressEvent(event);
 }
 
 int HexView::getHoverCell(const QPoint &mousePos) const

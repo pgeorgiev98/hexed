@@ -10,6 +10,7 @@ BufferedEditor::BufferedEditor(QIODevice *device)
 	, m_localPosition(sectionSize)
 	, m_absolutePosition(0)
 	, m_section(m_sections.end())
+	, m_size(device->size())
 {
 }
 
@@ -42,7 +43,7 @@ qint64 BufferedEditor::position() const
 
 qint64 BufferedEditor::size() const
 {
-	return m_device->size();
+	return m_size;
 }
 
 bool BufferedEditor::isEmpty() const
@@ -59,20 +60,39 @@ char BufferedEditor::getByte()
 {
 	if (m_localPosition == sectionSize) {
 		m_localPosition = 0;
-		auto iterator = m_sections.find(m_sectionIndex);
-		if (iterator == m_sections.end()) {
-			iterator = loadSection(m_sectionIndex);
-		}
+		m_section = getSection(++m_sectionIndex);
 		Q_ASSERT(m_section != m_sections.end());
-		++m_sectionIndex;
 	}
 	++m_absolutePosition;
 	return m_section->data[m_localPosition++];
 }
 
+void BufferedEditor::putByte(char byte)
+{
+	if (m_localPosition == sectionSize) {
+		m_localPosition = 0;
+		m_section = getSection(++m_sectionIndex);
+		Q_ASSERT(m_section != m_sections.end());
+	}
+	++m_absolutePosition;
+	Section &section = *m_section;
+	Modification modification(section.data[m_localPosition],
+							  byte,
+							  m_sectionIndex);
+	m_modifications.append(modification);
+
+	if (m_localPosition == section.length) {
+		++section.length;
+		++m_size;
+	}
+	section.data[m_localPosition++] = byte;
+	++section.modificationCount;
+}
+
 
 QMap<int, BufferedEditor::Section>::iterator BufferedEditor::loadSection(int sectionIndex)
 {
+	Q_ASSERT(!m_sections.contains(sectionIndex));
 	Section section;
 	qint64 startByte = sectionIndex * sectionSize;
 	if (!m_device->seek(startByte)) {
@@ -83,4 +103,12 @@ QMap<int, BufferedEditor::Section>::iterator BufferedEditor::loadSection(int sec
 
 	section.length = int(m_device->read(section.data, sectionSize));
 	return m_sections.insert(sectionIndex, std::move(section));
+}
+
+QMap<int, BufferedEditor::Section>::iterator BufferedEditor::getSection(int sectionIndex)
+{
+	auto iterator = m_sections.find(sectionIndex);
+	if (iterator == m_sections.end())
+		iterator = loadSection(sectionIndex);
+	return iterator;
 }
