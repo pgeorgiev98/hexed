@@ -3,6 +3,7 @@
 #include <QPainter>
 #include <QPaintEvent>
 #include <QMouseEvent>
+#include <QWheelEvent>
 #include <QtGlobal>
 #include <QFontDatabase>
 #include <QMenu>
@@ -12,6 +13,7 @@
 #include <QApplication>
 #include <QStyle>
 #include <QScrollBar>
+#include <QtMath>
 
 #include <QDebug>
 
@@ -47,6 +49,7 @@ HexView::HexView(QWidget *parent)
 	, m_editor(nullptr)
 	, m_verticalScrollBar(new QScrollBar(this))
 	, m_scrollTopRow(0)
+	, m_mouseScrollBuffer(0.0)
 {
 	m_verticalScrollBar->resize(QApplication::style()->pixelMetric(QStyle::PM_ScrollBarExtent), height());
 	connect(m_verticalScrollBar, &QAbstractSlider::valueChanged, this, &HexView::setVerticalScrollPosition);
@@ -407,6 +410,21 @@ void HexView::leaveEvent(QEvent *)
 {
 	m_hoveredIndex = -1;
 	repaint();
+}
+
+void HexView::wheelEvent(QWheelEvent *event)
+{
+	QPoint p = event->angleDelta();
+	if (p.y() != 0) {
+		m_mouseScrollBuffer += p.y() / 120.0;
+		int v = qFloor(m_mouseScrollBuffer);
+		if (v != 0) {
+			m_mouseScrollBuffer -= v;
+			qint64 newTopRow = m_scrollTopRow;
+			newTopRow -= v;
+			setVerticalScrollPosition(newTopRow);
+		}
+	}
 }
 
 int HexView::getHoverCell(const QPoint &mousePos) const

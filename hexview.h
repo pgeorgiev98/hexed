@@ -48,6 +48,7 @@ protected:
 	void mouseReleaseEvent(QMouseEvent *) override;
 	void mouseDoubleClickEvent(QMouseEvent *) override;
 	void leaveEvent(QEvent *) override;
+	void wheelEvent(QWheelEvent *) override;
 
 private:
 	QFont m_font;
@@ -69,6 +70,7 @@ private:
 	BufferedEditor *m_editor;
 	QScrollBar *m_verticalScrollBar;
 	qint64 m_scrollTopRow;
+	double m_mouseScrollBuffer;
 
 	int getHoverCell(const QPoint &mousePos) const;
 	int getHoverText(const QPoint &mousePos) const;
