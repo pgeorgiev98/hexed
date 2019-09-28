@@ -22,7 +22,7 @@ public:
 	bool isModified() const;
 
 private:
-	static const int sectionSize = 64;
+	static const int sectionSize = 16 * 1024;
 
 	struct Section
 	{
