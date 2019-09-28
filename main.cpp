@@ -1,6 +1,5 @@
-#include "hexview.h"
+#include "mainwindow.h"
 #include <QApplication>
-#include <QFile>
 #include <QTextStream>
 
 static void printUsage(const QStringList &args, QTextStream &out)
@@ -21,17 +20,11 @@ int main(int argc, char *argv[])
 	}
 
 	QString filename = argv[1];
-	QFile file(filename);
-	if (!file.open(QIODevice::ReadOnly)) {
-		out << "Failed to open file " << filename << ": " << file.errorString();
+
+	MainWindow w;
+	if (!w.openFile(filename))
 		return 1;
-	}
-
-	HexView w;
 	w.show();
-
-	BufferedEditor editor(&file);
-	w.setEditor(&editor);
 
 	return a.exec();
 }

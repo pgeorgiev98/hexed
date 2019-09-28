@@ -19,11 +19,13 @@ CONFIG += c++17
 SOURCES += \
         bufferededitor.cpp \
         hexview.cpp \
-        main.cpp
+        main.cpp \
+        mainwindow.cpp
 
 HEADERS += \
         bufferededitor.h \
-        hexview.h
+        hexview.h \
+        mainwindow.h
 
 # Default rules for deployment.
 qnx: target.path = /tmp/$${TARGET}/bin
