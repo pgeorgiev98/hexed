@@ -11,6 +11,7 @@ BufferedEditor::BufferedEditor(QIODevice *device)
 	, m_absolutePosition(0)
 	, m_section(m_sections.end())
 	, m_size(device->size())
+	, m_modificationCount(0)
 {
 }
 
@@ -87,6 +88,27 @@ void BufferedEditor::putByte(char byte)
 	}
 	section.data[m_localPosition++] = byte;
 	++section.modificationCount;
+
+	++m_modificationCount;
+}
+
+bool BufferedEditor::writeChanges()
+{
+	for (auto it = m_sections.begin(); it != m_sections.end(); ++it) {
+		const Section &section = *it;
+		if (section.modificationCount) {
+			if (!m_device->seek(it.key()))
+				return false;
+			if (!m_device->write(section.data, section.length))
+				return false;
+		}
+	}
+	return true;
+}
+
+bool BufferedEditor::isModified() const
+{
+	return m_modificationCount > 0;
 }
 
 

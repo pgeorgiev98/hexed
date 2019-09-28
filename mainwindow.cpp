@@ -2,6 +2,9 @@
 #include "hexview.h"
 
 #include <QMessageBox>
+#include <QMenuBar>
+#include <QMenu>
+#include <QAction>
 
 #define DEFAULT_WINDOW_HEIGHT 480
 
@@ -13,6 +16,22 @@ MainWindow::MainWindow(QWidget *parent)
 {
 	setCentralWidget(m_hexView);
 	resize(m_hexView->width(), DEFAULT_WINDOW_HEIGHT);
+
+	QMenu *fileMenu = new QMenu("&File");
+
+	QAction *saveAction = new QAction("&Save");
+	QAction *exitAction = new QAction("&Exit");
+
+	saveAction->setShortcut(QKeySequence::Save);
+	exitAction->setShortcut(QKeySequence::Quit);
+
+	fileMenu->addAction(saveAction);
+	fileMenu->addAction(exitAction);
+
+	menuBar()->addMenu(fileMenu);
+
+	connect(saveAction, &QAction::triggered, this, &MainWindow::saveChanges);
+	connect(exitAction, &QAction::triggered, this, &MainWindow::onExitClicked);
 }
 
 bool MainWindow::openFile(const QString &path)
@@ -28,4 +47,37 @@ bool MainWindow::openFile(const QString &path)
 	resize(m_hexView->width(), DEFAULT_WINDOW_HEIGHT);
 
 	return true;
+}
+
+bool MainWindow::saveChanges()
+{
+	if (!m_editor->writeChanges()) {
+		QMessageBox::critical(this, "",
+							  QString("Failed to save file %1: %2").
+								arg(m_file.fileName()).
+								arg(m_editor->errorString()));
+		return false;
+	}
+
+	return true;
+}
+
+void MainWindow::onExitClicked()
+{
+	bool exit = true;
+
+	if (m_editor->isModified()) {
+		auto button = QMessageBox::question(this, "",
+											QString("Save changes to %1?").arg(m_file.fileName()),
+											QMessageBox::Yes | QMessageBox::No | QMessageBox::Cancel);
+		if (button == QMessageBox::Yes) {
+			if (!saveChanges())
+				exit = false;
+		} else if (button == QMessageBox::Cancel) {
+			exit = false;
+		}
+	}
+
+	if (exit)
+		close();
 }

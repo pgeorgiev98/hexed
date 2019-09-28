@@ -19,6 +19,9 @@ public:
 public slots:
 	bool openFile(const QString &path);
 
+	bool saveChanges();
+	void onExitClicked();
+
 private:
 	HexView *m_hexView;
 	QFile m_file;

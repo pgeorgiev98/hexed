@@ -17,6 +17,8 @@ public:
 	bool atEnd() const;
 	char getByte();
 	void putByte(char byte);
+	bool writeChanges();
+	bool isModified() const;
 
 private:
 	static const int sectionSize = 64;
@@ -47,6 +49,7 @@ private:
 	QMap<int, Section>::iterator m_section;
 	QVector<Modification> m_modifications;
 	qint64 m_size;
+	int m_modificationCount;
 
 	QMap<int, Section>::iterator loadSection(int sectionIndex);
 	QMap<int, Section>::iterator getSection(int sectionIndex);
