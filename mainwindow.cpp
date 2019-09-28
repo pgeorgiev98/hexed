@@ -5,79 +5,86 @@
 #include <QMenuBar>
 #include <QMenu>
 #include <QAction>
-
-#define DEFAULT_WINDOW_HEIGHT 480
+#include <QTabWidget>
+#include <QFileDialog>
+#include <QStandardPaths>
 
 MainWindow::MainWindow(QWidget *parent)
 	: QMainWindow(parent)
-	, m_hexView(new HexView)
-	, m_file(QFile())
-	, m_editor(nullptr)
+	, m_tabWidget(new QTabWidget)
 {
-	setCentralWidget(m_hexView);
-	resize(m_hexView->width(), DEFAULT_WINDOW_HEIGHT);
+	setCentralWidget(m_tabWidget);
+	resize(640, 480);
+
+	m_tabWidget->setTabsClosable(true);
+	connect(m_tabWidget, &QTabWidget::tabCloseRequested, this, &MainWindow::closeTab);
 
 	QMenu *fileMenu = new QMenu("&File");
 
+	QAction *openAction = new QAction("&Open");
 	QAction *saveAction = new QAction("&Save");
 	QAction *exitAction = new QAction("&Exit");
 
+	openAction->setShortcut(QKeySequence::Open);
 	saveAction->setShortcut(QKeySequence::Save);
 	exitAction->setShortcut(QKeySequence::Quit);
 
+	fileMenu->addAction(openAction);
 	fileMenu->addAction(saveAction);
 	fileMenu->addAction(exitAction);
 
 	menuBar()->addMenu(fileMenu);
 
+	connect(openAction, &QAction::triggered, this, &MainWindow::onOpenClicked);
 	connect(saveAction, &QAction::triggered, this, &MainWindow::saveChanges);
 	connect(exitAction, &QAction::triggered, this, &MainWindow::onExitClicked);
 }
 
 bool MainWindow::openFile(const QString &path)
 {
-	m_file.setFileName(path);
-	if (!m_file.open(QIODevice::ReadWrite)) {
-		QMessageBox::critical(this, "",
-							  QString("Failed to open file %1: %2").arg(path).arg(m_file.errorString()));
-		return false;
-	}
-	m_editor = std::make_shared<BufferedEditor>(&m_file);
-	m_hexView->setEditor(m_editor.get());
-	resize(m_hexView->width(), DEFAULT_WINDOW_HEIGHT);
+	HexView *tab = new HexView;
+	bool ok = tab->openFile(path);
+	if (ok)
+		m_tabWidget->insertTab(m_tabWidget->count(), tab, path);
+	return ok;
+}
 
-	return true;
+void MainWindow::onOpenClicked()
+{
+	// TODO: Remember the last opened directory
+	QStringList dirs = QStandardPaths::standardLocations(QStandardPaths::HomeLocation);
+	QString dir;
+	if (!dirs.isEmpty())
+		dir = dirs.first();
+
+	QString filename = QFileDialog::getOpenFileName(this, "Open file", dir);
+	openFile(filename);
 }
 
 bool MainWindow::saveChanges()
 {
-	if (!m_editor->writeChanges()) {
-		QMessageBox::critical(this, "",
-							  QString("Failed to save file %1: %2").
-								arg(m_file.fileName()).
-								arg(m_editor->errorString()));
-		return false;
-	}
+	if (m_tabWidget->count() == 0)
+		return true;
+	HexView *tab = qobject_cast<HexView *>(m_tabWidget->currentWidget());
+	Q_ASSERT(tab);
+	return tab->saveChanges();
+}
 
+bool MainWindow::closeTab(int index)
+{
+	HexView *tab = qobject_cast<HexView *>(m_tabWidget->widget(index));
+	Q_ASSERT(tab);
+	if (!tab->quit())
+		return false;
+
+	m_tabWidget->removeTab(index);
 	return true;
 }
 
 void MainWindow::onExitClicked()
 {
-	bool exit = true;
-
-	if (m_editor->isModified()) {
-		auto button = QMessageBox::question(this, "",
-											QString("Save changes to %1?").arg(m_file.fileName()),
-											QMessageBox::Yes | QMessageBox::No | QMessageBox::Cancel);
-		if (button == QMessageBox::Yes) {
-			if (!saveChanges())
-				exit = false;
-		} else if (button == QMessageBox::Cancel) {
-			exit = false;
-		}
-	}
-
-	if (exit)
-		close();
+	for (int i = 0; i < m_tabWidget->count(); ++i)
+		if (!closeTab(i))
+			return;
+	close();
 }

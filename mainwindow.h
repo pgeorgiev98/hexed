@@ -1,14 +1,9 @@
 #ifndef MAINWINDOW_H
 #define MAINWINDOW_H
 
-#include "bufferededitor.h"
-
 #include <QMainWindow>
-#include <QFile>
 
-#include <memory>
-
-class HexView;
+class QTabWidget;
 
 class MainWindow : public QMainWindow
 {
@@ -19,13 +14,13 @@ public:
 public slots:
 	bool openFile(const QString &path);
 
+	void onOpenClicked();
 	bool saveChanges();
+	bool closeTab(int index);
 	void onExitClicked();
 
 private:
-	HexView *m_hexView;
-	QFile m_file;
-	std::shared_ptr<BufferedEditor> m_editor;
+	QTabWidget *m_tabWidget;
 };
 
 #endif // MAINWINDOW_H

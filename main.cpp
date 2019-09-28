@@ -14,16 +14,14 @@ int main(int argc, char *argv[])
 	QApplication a(argc, argv);
 
 	const auto &args = a.arguments();
-	if (args.size() == 1 || args[1] == "--help" || args[1] == "-h") {
+	if (args.size() > 1 && (args[1] == "--help" || args[1] == "-h")) {
 		printUsage(args, out);
 		return 0;
 	}
 
-	QString filename = argv[1];
-
 	MainWindow w;
-	if (!w.openFile(filename))
-		return 1;
+	for (int i = 1; i < a.arguments().size(); ++i)
+		w.openFile(a.arguments()[i]);
 	w.show();
 
 	return a.exec();

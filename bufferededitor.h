@@ -2,6 +2,7 @@
 #define BUFFEREDEDITOR_H
 
 #include <QMap>
+#include <QVector>
 
 class QIODevice;
 
@@ -36,6 +37,8 @@ private:
 	{
 		char before, after;
 		int sectionIndex;
+
+		Modification() {}
 
 		Modification(char before, char after, int sectionIndex)
 			: before(before), after(after), sectionIndex(sectionIndex) {}

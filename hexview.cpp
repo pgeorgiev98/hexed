@@ -15,6 +15,7 @@
 #include <QStyle>
 #include <QScrollBar>
 #include <QtMath>
+#include <QMessageBox>
 
 #include <QDebug>
 
@@ -75,7 +76,7 @@ HexView::HexView(QWidget *parent)
 	setFocusPolicy(Qt::WheelFocus);
 }
 
-QString HexView::toPlainText() const
+QString HexView::toPlainText()
 {
 	QString s;
 	if (m_editor->isEmpty())
@@ -163,15 +164,6 @@ void HexView::setFont(QFont font)
 	repaint();
 }
 
-void HexView::setEditor(BufferedEditor *editor)
-{
-	m_editor = editor;
-	m_verticalScrollBar->setRange(0, int(rowCount() - 1)); // TODO: qint64
-	setVerticalScrollPosition(0);
-	setFixedWidth(textX(m_bytesPerLine) + m_cellPadding + m_verticalScrollBar->width());
-	// TODO: clear selection
-}
-
 void HexView::setVerticalScrollPosition(int topRow)
 {
 	topRow = qBound(0, topRow, int(rowCount())); // TODO: qint64
@@ -179,6 +171,55 @@ void HexView::setVerticalScrollPosition(int topRow)
 	m_scrollTopRow = topRow;
 
 	repaint();
+}
+
+bool HexView::openFile(const QString &path)
+{
+	m_file.setFileName(path);
+	if (!m_file.open(QIODevice::ReadWrite)) {
+		QMessageBox::critical(this, "",
+							  QString("Failed to open file %1: %2").arg(path).arg(m_file.errorString()));
+		m_editor.reset();
+		return false;
+	}
+
+	m_editor = std::make_shared<BufferedEditor>(&m_file);
+
+	m_verticalScrollBar->setRange(0, int(rowCount() - 1)); // TODO: qint64
+	setVerticalScrollPosition(0);
+	setFixedWidth(textX(m_bytesPerLine) + m_cellPadding + m_verticalScrollBar->width());
+	selectNone();
+	repaint();
+
+	return true;
+}
+
+
+bool HexView::saveChanges()
+{
+	bool ok = m_editor->writeChanges();
+	if (!ok)
+		QMessageBox::critical(this, "",
+							  QString("Failed to save file %1: %2").arg(m_file.fileName()).arg(m_editor->errorString()));
+	return ok;
+}
+
+bool HexView::quit()
+{
+	if (!m_editor->isModified())
+		return true;
+
+	auto button = QMessageBox::question(this, "",
+										QString("Save changes to %1?").arg(m_file.fileName()),
+										QMessageBox::Yes | QMessageBox::No | QMessageBox::Cancel);
+	if (button == QMessageBox::Yes) {
+		if (!saveChanges())
+			return false;
+	} else if (button == QMessageBox::Cancel) {
+		return false;
+	}
+
+	return true;
 }
 
 void HexView::paintEvent(QPaintEvent *event)
@@ -276,6 +317,13 @@ void HexView::paintEvent(QPaintEvent *event)
 								 QString::number(m_editingCellByte, 16).toUpper());
 			painter.drawText(textCoord, ch);
 		}
+	}
+
+	{
+		painter.setPen(textColor);
+		int x = lineNumberWidth();
+		qint64 y = qMin((rowCount() - m_scrollTopRow) * cellHeight, qint64(height()));
+		painter.drawLine(x, 0, x, int(y));
 	}
 }
 

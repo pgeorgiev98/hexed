@@ -9,8 +9,10 @@
 #include <QFont>
 #include <QFontMetrics>
 #include <QMap>
+#include <QFile>
 
 #include <optional>
+#include <memory>
 
 class QScrollBar;
 
@@ -27,7 +29,7 @@ public:
 			: begin(begin), count(count) {}
 	};
 
-	QString toPlainText() const;
+	QString toPlainText();
 	QPoint getByteCoordinates(int index) const;
 	std::optional<ByteSelection> selection() const;
 	qint64 rowCount() const;
@@ -37,8 +39,10 @@ public slots:
 	void highlight(ByteSelection selection);
 	void selectNone();
 	void setFont(QFont font);
-	void setEditor(BufferedEditor *editor);
 	void setVerticalScrollPosition(int topRow);
+	bool openFile(const QString &path);
+	bool saveChanges();
+	bool quit();
 
 protected:
 	void paintEvent(QPaintEvent *) override;
@@ -68,7 +72,8 @@ private:
 		TextRows,
 	} m_selection;
 	bool m_selecting;
-	BufferedEditor *m_editor;
+	QFile m_file;
+	std::shared_ptr<BufferedEditor> m_editor;
 	QScrollBar *m_verticalScrollBar;
 	qint64 m_scrollTopRow;
 	double m_mouseScrollBuffer;
