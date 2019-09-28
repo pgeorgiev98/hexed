@@ -20,17 +20,23 @@ public slots:
 	bool saveChanges();
 	bool closeTab(int index);
 	void onExitClicked();
+	void undo();
 
 private slots:
 	void onTabCountChanged();
+	void onCanUndoChanged();
 
 private:
 	QTabWidget *m_tabWidget;
 
 	QMenu *m_fileMenu;
+	QMenu *m_editMenu;
+
 	QAction *m_openAction;
 	QAction *m_saveAction;
 	QAction *m_exitAction;
+
+	QAction *m_undoAction;
 };
 
 #endif // MAINWINDOW_H

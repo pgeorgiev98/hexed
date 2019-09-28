@@ -4,6 +4,8 @@
 #include <QMap>
 #include <QVector>
 
+#include <variant>
+
 class QIODevice;
 
 class BufferedEditor
@@ -20,6 +22,8 @@ public:
 	void putByte(char byte);
 	bool writeChanges();
 	bool isModified() const;
+	bool canUndo() const;
+	void undo();
 
 private:
 	static const int sectionSize = 16 * 1024;
@@ -33,16 +37,29 @@ private:
 		Section() : length(0), modificationCount(0) {}
 	};
 
-	struct Modification
+	struct Replacement
 	{
 		char before, after;
+		quint16 localPosition;
 		int sectionIndex;
 
-		Modification() {}
-
-		Modification(char before, char after, int sectionIndex)
-			: before(before), after(after), sectionIndex(sectionIndex) {}
+		Replacement() {}
+		Replacement(char before, char after, quint16 localPosition, int sectionIndex)
+			: before(before), after(after), localPosition(localPosition), sectionIndex(sectionIndex) {}
 	};
+
+	struct Insertion
+	{
+		char byte;
+		quint16 localPosition;
+		int sectionIndex;
+
+		Insertion() {}
+		Insertion(char byte, quint16 localPosition, int sectionIndex)
+			: byte(byte), localPosition(localPosition), sectionIndex(sectionIndex) {}
+	};
+
+	typedef std::variant<Replacement, Insertion> Modification;
 
 	QIODevice *m_device;
 	QMap<int, Section> m_sections;

@@ -13,9 +13,11 @@ MainWindow::MainWindow(QWidget *parent)
 	: QMainWindow(parent)
 	, m_tabWidget(new QTabWidget)
 	, m_fileMenu(new QMenu("&File"))
+	, m_editMenu(new QMenu("&Edit"))
 	, m_openAction(new QAction("&Open"))
 	, m_saveAction(new QAction("&Save"))
 	, m_exitAction(new QAction("&Exit"))
+	, m_undoAction(new QAction("&Undo"))
 {
 	setCentralWidget(m_tabWidget);
 	resize(640, 480);
@@ -26,16 +28,21 @@ MainWindow::MainWindow(QWidget *parent)
 	m_openAction->setShortcut(QKeySequence::Open);
 	m_saveAction->setShortcut(QKeySequence::Save);
 	m_exitAction->setShortcut(QKeySequence::Quit);
+	m_undoAction->setShortcut(QKeySequence::Undo);
 
 	m_fileMenu->addAction(m_openAction);
 	m_fileMenu->addAction(m_saveAction);
 	m_fileMenu->addAction(m_exitAction);
 
+	m_editMenu->addAction(m_undoAction);
+
 	menuBar()->addMenu(m_fileMenu);
+	menuBar()->addMenu(m_editMenu);
 
 	connect(m_openAction, &QAction::triggered, this, &MainWindow::onOpenClicked);
 	connect(m_saveAction, &QAction::triggered, this, &MainWindow::saveChanges);
 	connect(m_exitAction, &QAction::triggered, this, &MainWindow::onExitClicked);
+	connect(m_undoAction, &QAction::triggered, this, &MainWindow::undo);
 
 	onTabCountChanged();
 }
@@ -46,6 +53,8 @@ bool MainWindow::openFile(const QString &path)
 	bool ok = tab->openFile(path);
 	if (ok) {
 		m_tabWidget->insertTab(m_tabWidget->count(), tab, path);
+		connect(tab, &HexView::canUndoChanged, this, &MainWindow::onCanUndoChanged);
+		m_tabWidget->setCurrentWidget(tab);
 		onTabCountChanged();
 	}
 	return ok;
@@ -92,9 +101,28 @@ void MainWindow::onExitClicked()
 	close();
 }
 
+void MainWindow::undo()
+{
+	HexView *tab = qobject_cast<HexView *>(m_tabWidget->currentWidget());
+	Q_ASSERT(tab);
+	tab->undo();
+}
+
 
 void MainWindow::onTabCountChanged()
 {
 	bool hasTabs = m_tabWidget->count() > 0;
 	m_saveAction->setEnabled(hasTabs);
+	onCanUndoChanged();
+}
+
+void MainWindow::onCanUndoChanged()
+{
+	if (m_tabWidget->count() == 0) {
+		m_undoAction->setEnabled(false);
+		return;
+	}
+	HexView *tab = qobject_cast<HexView *>(m_tabWidget->currentWidget());
+	Q_ASSERT(tab);
+	m_undoAction->setEnabled(tab->canUndo());
 }

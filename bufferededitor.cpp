@@ -77,15 +77,15 @@ void BufferedEditor::putByte(char byte)
 	}
 	++m_absolutePosition;
 	Section &section = *m_section;
-	Modification modification(section.data[m_localPosition],
-							  byte,
-							  m_sectionIndex);
-	m_modifications.append(modification);
 
 	if (m_localPosition == section.length) {
 		++section.length;
 		++m_size;
+		m_modifications.append(Insertion(byte, quint16(m_localPosition), m_sectionIndex));
+	} else {
+		m_modifications.append(Replacement(section.data[m_localPosition], byte, quint16(m_localPosition), m_sectionIndex));
 	}
+
 	section.data[m_localPosition++] = byte;
 	++section.modificationCount;
 
@@ -109,6 +109,33 @@ bool BufferedEditor::writeChanges()
 bool BufferedEditor::isModified() const
 {
 	return m_modificationCount > 0;
+}
+
+bool BufferedEditor::canUndo() const
+{
+	return !m_modifications.isEmpty();
+}
+
+void BufferedEditor::undo()
+{
+	if (!canUndo())
+		return;
+
+	auto var = m_modifications.last();
+	if (std::holds_alternative<Replacement>(var)) {
+		Replacement replacement = std::get<Replacement>(var);
+		auto section = m_sections.find(replacement.sectionIndex);
+		section->data[replacement.localPosition] = replacement.before;
+	} else {
+		Insertion insertion = std::get<Insertion>(var);
+		auto section = m_sections.find(insertion.sectionIndex);
+		--section->length;
+		--m_size;
+		if (section->length == 0)
+			m_sections.erase(section);
+	}
+
+	m_modifications.removeLast();
 }
 
 

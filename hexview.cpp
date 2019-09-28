@@ -119,6 +119,11 @@ qint64 HexView::rowCount() const
 	return m_editor->size() / m_bytesPerLine + (m_editor->size() % m_bytesPerLine > 0);
 }
 
+bool HexView::canUndo() const
+{
+	return m_editor->canUndo();
+}
+
 void HexView::setBytesPerLine(int bytesPerLine)
 {
 	/*
@@ -220,6 +225,13 @@ bool HexView::quit()
 	}
 
 	return true;
+}
+
+void HexView::undo()
+{
+	m_editor->undo();
+	emit canUndoChanged(canUndo());
+	repaint();
 }
 
 void HexView::paintEvent(QPaintEvent *event)
@@ -517,6 +529,7 @@ void HexView::keyPressEvent(QKeyEvent *event)
 	auto putByte = [this]() {
 		m_editor->seek(m_editingCell);
 		m_editor->putByte(m_editingCellByte);
+		emit canUndoChanged(canUndo());
 		m_editingCell = -1;
 	};
 
@@ -555,6 +568,7 @@ void HexView::keyPressEvent(QKeyEvent *event)
 			if (byte >= 32 && byte < 127) {
 				m_editor->seek(m_selectionStart);
 				m_editor->putByte(byte);
+				emit canUndoChanged(canUndo());
 				++m_selectionStart;
 				++m_selectionEnd;
 				repaint();

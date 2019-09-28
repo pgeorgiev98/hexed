@@ -33,6 +33,10 @@ public:
 	QPoint getByteCoordinates(int index) const;
 	std::optional<ByteSelection> selection() const;
 	qint64 rowCount() const;
+	bool canUndo() const;
+
+signals:
+	void canUndoChanged(bool canUndo);
 
 public slots:
 	void setBytesPerLine(int bytesPerLine);
@@ -43,6 +47,7 @@ public slots:
 	bool openFile(const QString &path);
 	bool saveChanges();
 	bool quit();
+	void undo();
 
 protected:
 	void paintEvent(QPaintEvent *) override;
