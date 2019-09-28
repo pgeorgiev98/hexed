@@ -6,12 +6,12 @@
 
 #include <variant>
 
-class QIODevice;
+class QFileDevice;
 
 class BufferedEditor
 {
 public:
-	BufferedEditor(QIODevice *device);
+	BufferedEditor(QFileDevice *device);
 	QString errorString() const;
 	bool seek(qint64 position);
 	qint64 position() const;
@@ -61,7 +61,7 @@ private:
 
 	typedef std::variant<Replacement, Insertion> Modification;
 
-	QIODevice *m_device;
+	QFileDevice *m_device;
 	QMap<int, Section> m_sections;
 	int m_sectionIndex;
 	int m_localPosition;
