@@ -12,6 +12,10 @@
 MainWindow::MainWindow(QWidget *parent)
 	: QMainWindow(parent)
 	, m_tabWidget(new QTabWidget)
+	, m_fileMenu(new QMenu("&File"))
+	, m_openAction(new QAction("&Open"))
+	, m_saveAction(new QAction("&Save"))
+	, m_exitAction(new QAction("&Exit"))
 {
 	setCentralWidget(m_tabWidget);
 	resize(640, 480);
@@ -19,33 +23,31 @@ MainWindow::MainWindow(QWidget *parent)
 	m_tabWidget->setTabsClosable(true);
 	connect(m_tabWidget, &QTabWidget::tabCloseRequested, this, &MainWindow::closeTab);
 
-	QMenu *fileMenu = new QMenu("&File");
+	m_openAction->setShortcut(QKeySequence::Open);
+	m_saveAction->setShortcut(QKeySequence::Save);
+	m_exitAction->setShortcut(QKeySequence::Quit);
 
-	QAction *openAction = new QAction("&Open");
-	QAction *saveAction = new QAction("&Save");
-	QAction *exitAction = new QAction("&Exit");
+	m_fileMenu->addAction(m_openAction);
+	m_fileMenu->addAction(m_saveAction);
+	m_fileMenu->addAction(m_exitAction);
 
-	openAction->setShortcut(QKeySequence::Open);
-	saveAction->setShortcut(QKeySequence::Save);
-	exitAction->setShortcut(QKeySequence::Quit);
+	menuBar()->addMenu(m_fileMenu);
 
-	fileMenu->addAction(openAction);
-	fileMenu->addAction(saveAction);
-	fileMenu->addAction(exitAction);
+	connect(m_openAction, &QAction::triggered, this, &MainWindow::onOpenClicked);
+	connect(m_saveAction, &QAction::triggered, this, &MainWindow::saveChanges);
+	connect(m_exitAction, &QAction::triggered, this, &MainWindow::onExitClicked);
 
-	menuBar()->addMenu(fileMenu);
-
-	connect(openAction, &QAction::triggered, this, &MainWindow::onOpenClicked);
-	connect(saveAction, &QAction::triggered, this, &MainWindow::saveChanges);
-	connect(exitAction, &QAction::triggered, this, &MainWindow::onExitClicked);
+	onTabCountChanged();
 }
 
 bool MainWindow::openFile(const QString &path)
 {
 	HexView *tab = new HexView;
 	bool ok = tab->openFile(path);
-	if (ok)
+	if (ok) {
 		m_tabWidget->insertTab(m_tabWidget->count(), tab, path);
+		onTabCountChanged();
+	}
 	return ok;
 }
 
@@ -78,6 +80,7 @@ bool MainWindow::closeTab(int index)
 		return false;
 
 	m_tabWidget->removeTab(index);
+	onTabCountChanged();
 	return true;
 }
 
@@ -87,4 +90,11 @@ void MainWindow::onExitClicked()
 		if (!closeTab(i))
 			return;
 	close();
+}
+
+
+void MainWindow::onTabCountChanged()
+{
+	bool hasTabs = m_tabWidget->count() > 0;
+	m_saveAction->setEnabled(hasTabs);
 }

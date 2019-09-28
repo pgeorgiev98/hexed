@@ -4,6 +4,8 @@
 #include <QMainWindow>
 
 class QTabWidget;
+class QMenu;
+class QAction;
 
 class MainWindow : public QMainWindow
 {
@@ -19,8 +21,16 @@ public slots:
 	bool closeTab(int index);
 	void onExitClicked();
 
+private slots:
+	void onTabCountChanged();
+
 private:
 	QTabWidget *m_tabWidget;
+
+	QMenu *m_fileMenu;
+	QAction *m_openAction;
+	QAction *m_saveAction;
+	QAction *m_exitAction;
 };
 
 #endif // MAINWINDOW_H
