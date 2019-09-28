@@ -40,9 +40,6 @@ public slots:
 	void setEditor(BufferedEditor *editor);
 	void setVerticalScrollPosition(int topRow);
 
-signals:
-	void highlightInTextView(ByteSelection selection);
-
 protected:
 	void paintEvent(QPaintEvent *) override;
 	void resizeEvent(QResizeEvent *event) override;

@@ -316,15 +316,12 @@ void HexView::mousePressEvent(QMouseEvent *event)
 		QAction copyHexAction("Copy hex");
 		QAction selectAllAction("Select All");
 		QAction selectNoneAction("Select None");
-		QAction highlightInTextViewAction("Highlight in Text View");
 
 		menu.addAction(&copyTextAction);
 		menu.addAction(&copyHexAction);
 		menu.addSeparator();
 		menu.addAction(&selectAllAction);
 		menu.addAction(&selectNoneAction);
-		menu.addSeparator();
-		menu.addAction(&highlightInTextViewAction);
 
 		menu.popup(event->globalPos());
 
@@ -333,7 +330,6 @@ void HexView::mousePressEvent(QMouseEvent *event)
 		copyHexAction.setEnabled(hasSelection);
 		selectAllAction.setEnabled(!m_editor->isEmpty());
 		selectNoneAction.setEnabled(hasSelection);
-		highlightInTextViewAction.setEnabled(hasSelection);
 
 		QAction *a = menu.exec();
 
@@ -367,8 +363,6 @@ void HexView::mousePressEvent(QMouseEvent *event)
 			repaint();
 		} else if (a == &selectNoneAction) {
 			selectNone();
-		} else if (a == &highlightInTextViewAction) {
-			emit highlightInTextView(ByteSelection(m_selectionStart, m_selectionEnd - m_selectionStart + 1));
 		}
 		return;
 	}
