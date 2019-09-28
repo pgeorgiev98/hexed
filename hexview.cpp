@@ -18,6 +18,7 @@
 #include <QDebug>
 
 static QColor backgroundColor("#ffffff");
+static QColor alternateBackgroundColor("#aaaaaa");
 static QColor textColor("#000000");
 static QColor hoverTextColor("#ff0000");
 static QColor selectedColor("#0000ff");
@@ -56,6 +57,7 @@ HexView::HexView(QWidget *parent)
 
 	QPalette pal = palette();
 	backgroundColor = pal.base().color();
+	alternateBackgroundColor = pal.alternateBase().color();
 	textColor = pal.text().color();
 	hoverTextColor = pal.link().color();
 	selectedColor = pal.highlight().color();
@@ -206,6 +208,14 @@ void HexView::paintEvent(QPaintEvent *event)
 	int i = startY * m_bytesPerLine;
 	m_editor->seek(i);
 	for (int y = startY, yCoord = m_cellSize; i < m_editor->size() && y < endY; ++y, yCoord += cellHeight) {
+
+		bool rowIsHovered = m_hoveredIndex == -1 ? false : m_hoveredIndex / 16 == y;
+
+		painter.setPen(rowIsHovered ? textColor : alternateBackgroundColor);
+		painter.setBrush(y % 2 == 0 ? backgroundColor : alternateBackgroundColor);
+		painter.drawRect(0, yCoord - m_fontMetrics.ascent() - m_cellPadding / 2, width(), cellHeight - 1);
+
+		painter.setPen(rowIsHovered ? hoverTextColor : textColor);
 		painter.drawText(QPointF(m_cellSize / 2, yCoord),
 						 QString::number(m_editor->position(), 16).rightJustified(lineNumberDigitsCount(), '0'));
 
