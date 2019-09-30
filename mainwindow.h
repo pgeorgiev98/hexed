@@ -21,10 +21,12 @@ public slots:
 	bool closeTab(int index);
 	void onExitClicked();
 	void undo();
+	void redo();
 
 private slots:
 	void onTabCountChanged();
 	void onCanUndoChanged();
+	void onCanRedoChanged();
 
 private:
 	QTabWidget *m_tabWidget;
@@ -37,6 +39,7 @@ private:
 	QAction *m_exitAction;
 
 	QAction *m_undoAction;
+	QAction *m_redoAction;
 };
 
 #endif // MAINWINDOW_H

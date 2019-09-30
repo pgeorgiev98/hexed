@@ -33,9 +33,11 @@ public:
 	std::optional<ByteSelection> selection() const;
 	qint64 rowCount() const;
 	bool canUndo() const;
+	bool canRedo() const;
 
 signals:
 	void canUndoChanged(bool canUndo);
+	void canRedoChanged(bool canRedo);
 
 public slots:
 	void setBytesPerLine(int bytesPerLine);
@@ -47,6 +49,7 @@ public slots:
 	bool saveChanges();
 	bool quit();
 	void undo();
+	void redo();
 
 protected:
 	void paintEvent(QPaintEvent *) override;

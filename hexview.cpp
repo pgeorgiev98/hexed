@@ -124,6 +124,11 @@ bool HexView::canUndo() const
 	return m_editor->canUndo();
 }
 
+bool HexView::canRedo() const
+{
+	return m_editor->canRedo();
+}
+
 void HexView::setBytesPerLine(int bytesPerLine)
 {
 	/*
@@ -197,6 +202,7 @@ bool HexView::openFile(const QString &path)
 	repaint();
 
 	connect(m_editor, &BufferedEditor::canUndoChanged, this, &HexView::canUndoChanged);
+	connect(m_editor, &BufferedEditor::canRedoChanged, this, &HexView::canRedoChanged);
 
 	return true;
 }
@@ -232,6 +238,12 @@ bool HexView::quit()
 void HexView::undo()
 {
 	m_editor->undo();
+	repaint();
+}
+
+void HexView::redo()
+{
+	m_editor->redo();
 	repaint();
 }
 

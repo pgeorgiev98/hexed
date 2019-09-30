@@ -11,6 +11,7 @@ BufferedEditor::BufferedEditor(QFileDevice *device, QObject *parent)
 	, m_localPosition(sectionSize)
 	, m_absolutePosition(0)
 	, m_section(m_sections.end())
+	, m_currentModificationIndex(0)
 	, m_size(device->size())
 	, m_modificationCount(0)
 {
@@ -78,6 +79,12 @@ void BufferedEditor::putByte(char byte)
 	}
 	Section &section = *m_section;
 
+	bool couldRedo = canRedo();
+	if (couldRedo) {
+		m_modifications.remove(m_currentModificationIndex, m_modifications.size() - m_currentModificationIndex);
+		Q_ASSERT(!canRedo());
+	}
+
 	if (m_localPosition == section.length) {
 		++section.length;
 		++m_size;
@@ -91,11 +98,13 @@ void BufferedEditor::putByte(char byte)
 
 	++m_modificationCount;
 	++m_absolutePosition;
+	++m_currentModificationIndex;
 
-	if (m_modifications.size() == 1) {
-		Q_ASSERT(canUndo());
-		emit canUndoChanged(true);
-	}
+	Q_ASSERT(canUndo());
+	emit canUndoChanged(true);
+
+	if (couldRedo)
+		emit canRedoChanged(false);
 }
 
 bool BufferedEditor::writeChanges()
@@ -103,13 +112,10 @@ bool BufferedEditor::writeChanges()
 	for (auto it = m_sections.begin(); it != m_sections.end(); ++it) {
 		Section &section = *it;
 		if (section.modificationCount) {
-			qDebug() << "Writing section" << it.key();
-			qDebug() << section.length;
 			if (!m_device->seek(it.key()))
 				return false;
 			if (!m_device->write(section.data, section.length))
 				return false;
-			qDebug() << "Wrote section" << it.key();
 			m_modificationCount -= section.modificationCount;
 			section.modificationCount = 0;
 		}
@@ -129,7 +135,12 @@ bool BufferedEditor::isModified() const
 
 bool BufferedEditor::canUndo() const
 {
-	return !m_modifications.isEmpty();
+	return m_currentModificationIndex > 0;
+}
+
+bool BufferedEditor::canRedo() const
+{
+	return m_currentModificationIndex < m_modifications.size();
 }
 
 void BufferedEditor::undo()
@@ -137,7 +148,7 @@ void BufferedEditor::undo()
 	if (!canUndo())
 		return;
 
-	auto var = m_modifications.last();
+	auto var = m_modifications[m_currentModificationIndex - 1];
 	if (std::holds_alternative<Replacement>(var)) {
 		Replacement replacement = std::get<Replacement>(var);
 		auto section = m_sections.find(replacement.sectionIndex);
@@ -145,7 +156,6 @@ void BufferedEditor::undo()
 		--section->modificationCount;
 	} else {
 		Insertion insertion = std::get<Insertion>(var);
-		qDebug() << "Undo: Insertion in" << insertion.sectionIndex;
 		auto section = m_sections.find(insertion.sectionIndex);
 		--section->length;
 		--section->modificationCount;
@@ -155,12 +165,40 @@ void BufferedEditor::undo()
 	}
 
 	--m_modificationCount;
-	m_modifications.removeLast();
+	--m_currentModificationIndex;
 
-	if (m_modifications.isEmpty()) {
-		Q_ASSERT(!canUndo());
+	emit canRedoChanged(true);
+
+	if (!canUndo())
 		emit canUndoChanged(false);
+}
+
+void BufferedEditor::redo()
+{
+	if (!canRedo())
+		return;
+
+	auto var = m_modifications[m_currentModificationIndex];
+	if (std::holds_alternative<Replacement>(var)) {
+		Replacement replacement = std::get<Replacement>(var);
+		auto section = m_sections.find(replacement.sectionIndex);
+		section->data[replacement.localPosition] = replacement.after;
+		++section->modificationCount;
+	} else {
+		Insertion insertion = std::get<Insertion>(var);
+		auto section = getSection(insertion.sectionIndex);
+		section->data[++section->length] = insertion.byte;
+		++section->modificationCount;
+		++m_size;
 	}
+
+	++m_modificationCount;
+	++m_currentModificationIndex;
+
+	emit canUndoChanged(true);
+
+	if (!canRedo())
+		emit canRedoChanged(false);
 }
 
 

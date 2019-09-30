@@ -25,10 +25,13 @@ public:
 	bool writeChanges();
 	bool isModified() const;
 	bool canUndo() const;
+	bool canRedo() const;
 	void undo();
+	void redo();
 
 signals:
 	void canUndoChanged(bool canUndo);
+	void canRedoChanged(bool canRedo);
 
 private:
 	static const int sectionSize = 16 * 1024;
@@ -73,6 +76,7 @@ private:
 	qint64 m_absolutePosition;
 	QMap<int, Section>::iterator m_section;
 	QVector<Modification> m_modifications;
+	int m_currentModificationIndex;
 	qint64 m_size;
 	int m_modificationCount;
 
