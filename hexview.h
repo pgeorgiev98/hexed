@@ -12,7 +12,6 @@
 #include <QFile>
 
 #include <optional>
-#include <memory>
 
 class QScrollBar;
 
@@ -78,7 +77,7 @@ private:
 	} m_selection;
 	bool m_selecting;
 	QFile m_file;
-	std::shared_ptr<BufferedEditor> m_editor;
+	BufferedEditor *m_editor;
 	QScrollBar *m_verticalScrollBar;
 	qint64 m_scrollTopRow;
 	double m_mouseScrollBuffer;

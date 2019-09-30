@@ -184,17 +184,19 @@ bool HexView::openFile(const QString &path)
 	if (!m_file.open(QIODevice::ReadWrite)) {
 		QMessageBox::critical(this, "",
 							  QString("Failed to open file %1: %2").arg(path).arg(m_file.errorString()));
-		m_editor.reset();
+		m_editor = nullptr;
 		return false;
 	}
 
-	m_editor = std::make_shared<BufferedEditor>(&m_file);
+	m_editor = new BufferedEditor(&m_file, this);
 
 	m_verticalScrollBar->setRange(0, int(rowCount() - 1)); // TODO: qint64
 	setVerticalScrollPosition(0);
 	setFixedWidth(textX(m_bytesPerLine) + m_cellPadding + m_verticalScrollBar->width());
 	selectNone();
 	repaint();
+
+	connect(m_editor, &BufferedEditor::canUndoChanged, this, &HexView::canUndoChanged);
 
 	return true;
 }
@@ -230,7 +232,6 @@ bool HexView::quit()
 void HexView::undo()
 {
 	m_editor->undo();
-	emit canUndoChanged(canUndo());
 	repaint();
 }
 
@@ -529,7 +530,6 @@ void HexView::keyPressEvent(QKeyEvent *event)
 	auto putByte = [this]() {
 		m_editor->seek(m_editingCell);
 		m_editor->putByte(m_editingCellByte);
-		emit canUndoChanged(canUndo());
 		m_editingCell = -1;
 	};
 
@@ -568,7 +568,6 @@ void HexView::keyPressEvent(QKeyEvent *event)
 			if (byte >= 32 && byte < 127) {
 				m_editor->seek(m_selectionStart);
 				m_editor->putByte(byte);
-				emit canUndoChanged(canUndo());
 				++m_selectionStart;
 				++m_selectionEnd;
 				repaint();

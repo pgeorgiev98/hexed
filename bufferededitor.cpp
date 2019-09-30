@@ -4,8 +4,9 @@
 
 #include <QDebug>
 
-BufferedEditor::BufferedEditor(QFileDevice *device)
-	: m_device(device)
+BufferedEditor::BufferedEditor(QFileDevice *device, QObject *parent)
+	: QObject(parent)
+	, m_device(device)
 	, m_sectionIndex(-1)
 	, m_localPosition(sectionSize)
 	, m_absolutePosition(0)
@@ -75,7 +76,6 @@ void BufferedEditor::putByte(char byte)
 		m_section = getSection(++m_sectionIndex);
 		Q_ASSERT(m_section != m_sections.end());
 	}
-	++m_absolutePosition;
 	Section &section = *m_section;
 
 	if (m_localPosition == section.length) {
@@ -90,6 +90,12 @@ void BufferedEditor::putByte(char byte)
 	++section.modificationCount;
 
 	++m_modificationCount;
+	++m_absolutePosition;
+
+	if (m_modifications.size() == 1) {
+		Q_ASSERT(canUndo());
+		emit canUndoChanged(true);
+	}
 }
 
 bool BufferedEditor::writeChanges()
@@ -150,6 +156,11 @@ void BufferedEditor::undo()
 
 	--m_modificationCount;
 	m_modifications.removeLast();
+
+	if (m_modifications.isEmpty()) {
+		Q_ASSERT(!canUndo());
+		emit canUndoChanged(false);
+	}
 }
 
 

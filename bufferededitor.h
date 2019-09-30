@@ -1,6 +1,7 @@
 #ifndef BUFFEREDEDITOR_H
 #define BUFFEREDEDITOR_H
 
+#include <QObject>
 #include <QMap>
 #include <QVector>
 
@@ -8,10 +9,11 @@
 
 class QFileDevice;
 
-class BufferedEditor
+class BufferedEditor : public QObject
 {
+	Q_OBJECT
 public:
-	BufferedEditor(QFileDevice *device);
+	BufferedEditor(QFileDevice *device, QObject *parent = nullptr);
 	QString errorString() const;
 	bool seek(qint64 position);
 	qint64 position() const;
@@ -24,6 +26,9 @@ public:
 	bool isModified() const;
 	bool canUndo() const;
 	void undo();
+
+signals:
+	void canUndoChanged(bool canUndo);
 
 private:
 	static const int sectionSize = 16 * 1024;
