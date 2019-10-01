@@ -8,7 +8,7 @@ An open-source, cross-platform binary file hex editor written in C++ with Qt5.
 - Displays both the hex and ascii values of the bytes
 - Loads only the parts of the file that are needed in memory
 - Can have many files open at once in tabs
-- Supports undo functionality
+- Undo and redo functionality
 
 And that's pretty much it :)
 
