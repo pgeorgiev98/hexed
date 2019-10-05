@@ -215,8 +215,7 @@ bool BufferedEditor::writeChanges()
 
 	// Write the modified sections
 	for (int i = 0; i < m_sections.size(); ++i) {
-		const Section &s = m_sections[i];
-		qDebug() << "S" << i << ":" << s.modificationCount;
+		Section &s = m_sections[i];
 		if (s.isModified() || s.savedPosition != s.currentPosition) {
 			qDebug("Writing section %d (%d)", i, m_sections.size());
 			QVector<char> buffer;
@@ -235,8 +234,15 @@ bool BufferedEditor::writeChanges()
 				return false;
 			}
 			Q_ASSERT(bytesWritten == buffer.size());
+
+			s.modificationCount = 0;
+			s.savedPosition = s.currentPosition;
+			for (Byte &b : s.data)
+				b.saved = b.current;
 		}
 	}
+
+	m_modificationCount = 0;
 
 	return true;
 }
