@@ -2,7 +2,6 @@
 #define BUFFEREDEDITOR_H
 
 #include <QObject>
-#include <QMap>
 #include <QVector>
 
 #include <variant>
@@ -13,6 +12,22 @@ class BufferedEditor : public QObject
 {
 	Q_OBJECT
 public:
+	struct Byte
+	{
+		std::optional<char> saved;
+		std::optional<char> current;
+
+		bool isModified() const
+		{
+			return !saved || *saved != current;
+		}
+
+		Byte() {}
+
+		Byte(std::optional<char> saved, std::optional<char> current)
+			: saved(saved), current(current) {}
+	};
+
 	BufferedEditor(QFileDevice *device, QObject *parent = nullptr);
 	QString errorString() const;
 	bool seek(qint64 position);
@@ -20,8 +35,10 @@ public:
 	qint64 size() const;
 	bool isEmpty() const;
 	bool atEnd() const;
-	char getByte();
-	void putByte(char byte);
+	void moveForward();
+	Byte getByte();
+	void replaceByte(char byte);
+	// TODO: void insertByte(char byte);
 	bool writeChanges();
 	bool isModified() const;
 	bool canUndo() const;
@@ -38,50 +55,74 @@ private:
 
 	struct Section
 	{
-		char data[sectionSize];
-		int length;
+		qint64 savedPosition;
+		qint64 currentPosition;
+		QVector<Byte> data;
 		int modificationCount;
 
-		Section() : length(0), modificationCount(0) {}
+		bool isModified() const
+		{
+			return modificationCount != 0;
+		}
+
+		int savedLength() const
+		{
+			int l = 0;
+			for (Byte b : data)
+				l += b.saved.has_value();
+			return l;
+		}
+
+		int currentLength() const
+		{
+			int l = 0;
+			for (Byte b : data)
+				l += b.current.has_value();
+			return l;
+		}
+
+		Section() : savedPosition(-1), currentPosition(-1), modificationCount(0) {}
+		Section(qint64 savedPosition, qint64 currentPosition)
+			: savedPosition(savedPosition), currentPosition(currentPosition), modificationCount(0) {}
 	};
 
 	struct Replacement
 	{
 		char before, after;
-		quint16 localPosition;
-		int sectionIndex;
+		qint64 position;
 
 		Replacement() {}
-		Replacement(char before, char after, quint16 localPosition, int sectionIndex)
-			: before(before), after(after), localPosition(localPosition), sectionIndex(sectionIndex) {}
+		Replacement(char before, char after, qint64 position)
+			: before(before), after(after), position(position) {}
 	};
 
 	struct Insertion
 	{
 		char byte;
-		quint16 localPosition;
-		int sectionIndex;
+		qint64 position;
 
 		Insertion() {}
-		Insertion(char byte, quint16 localPosition, int sectionIndex)
-			: byte(byte), localPosition(localPosition), sectionIndex(sectionIndex) {}
+		Insertion(char byte, qint64 position)
+			: byte(byte), position(position) {}
 	};
+
+	// TODO: Add Deletion
 
 	typedef std::variant<Replacement, Insertion> Modification;
 
 	QFileDevice *m_device;
-	QMap<int, Section> m_sections;
+	QVector<Section> m_sections;
 	int m_sectionIndex;
-	int m_localPosition;
-	qint64 m_absolutePosition;
-	QMap<int, Section>::iterator m_section;
+	int m_sectionLocalPosition;
+	qint64 m_position;
+	qint64 m_size;
 	QVector<Modification> m_modifications;
 	int m_currentModificationIndex;
-	qint64 m_size;
 	int m_modificationCount;
 
-	QMap<int, Section>::iterator loadSection(int sectionIndex);
-	QMap<int, Section>::iterator getSection(int sectionIndex);
+	int getSectionIndex(qint64 position);
+	void doModification(Modification modification);
+	void undoModification(Modification modification);
 };
 
 #endif // BUFFEREDEDITOR_H

@@ -86,7 +86,7 @@ QString HexView::toPlainText()
 	m_editor->seek(0);
 	while (!m_editor->atEnd()) {
 		for (int x = 0; !m_editor->atEnd() && x < m_bytesPerLine; ++x) {
-			unsigned char b = static_cast<unsigned char>(m_editor->getByte());
+			unsigned char b = static_cast<unsigned char>(*m_editor->getByte().current);
 			byte[0] = hexTable[(b >> 4) & 0xF];
 			byte[1] = hexTable[(b >> 0) & 0xF];
 			s.append(byte);
@@ -276,6 +276,8 @@ void HexView::paintEvent(QPaintEvent *event)
 	QString cellText = "FF";
 	QString ch = "a";
 	int i = startY * m_bytesPerLine;
+	if (i >= m_editor->size())
+		return;
 	m_editor->seek(i);
 	for (int y = startY, yCoord = m_cellSize; i < m_editor->size() && y < endY; ++y, yCoord += cellHeight) {
 
@@ -290,7 +292,7 @@ void HexView::paintEvent(QPaintEvent *event)
 						 QString::number(m_editor->position(), 16).rightJustified(lineNumberDigitsCount(), '0'));
 
 		for (int x = 0; i < m_editor->size() && x < m_bytesPerLine; ++x, ++i) {
-			unsigned char byte = static_cast<unsigned char>(m_editor->getByte());
+			unsigned char byte = static_cast<unsigned char>(*m_editor->getByte().current);
 			cellText[0] = hexTable[(byte >> 4) & 0xF];
 			cellText[1] = hexTable[(byte >> 0) & 0xF];
 			ch[0] = (byte >= 32 && byte <= 126) ? char(byte) : '.';
@@ -437,7 +439,7 @@ void HexView::mousePressEvent(QMouseEvent *event)
 			QString s;
 			m_editor->seek(selectionStart);
 			while (m_editor->position() < selectionEnd) {
-				char b = m_editor->getByte();
+				char b = *m_editor->getByte().current;
 				s.append((b >= 32 && b <= 126) ? b : '.');
 			}
 			QClipboard *clipboard = QGuiApplication::clipboard();
@@ -447,7 +449,7 @@ void HexView::mousePressEvent(QMouseEvent *event)
 			QString s;
 			m_editor->seek(selectionStart);
 			while (m_editor->position() < selectionEnd) {
-				unsigned char byte = static_cast<unsigned char>(m_editor->getByte());
+				unsigned char byte = static_cast<unsigned char>(*m_editor->getByte().current);
 				cell[0] = hexTable[(byte >> 4) & 0xF];
 				cell[1] = hexTable[(byte >> 0) & 0xF];
 				s.append(cell);
@@ -541,7 +543,7 @@ void HexView::keyPressEvent(QKeyEvent *event)
 	bool keyIsHexDigit = hexDigits.contains(key);
 	auto putByte = [this]() {
 		m_editor->seek(m_editingCell);
-		m_editor->putByte(m_editingCellByte);
+		m_editor->replaceByte(m_editingCellByte);
 		m_editingCell = -1;
 	};
 
@@ -579,7 +581,7 @@ void HexView::keyPressEvent(QKeyEvent *event)
 			char byte = text[0].toLatin1();
 			if (byte >= 32 && byte < 127) {
 				m_editor->seek(m_selectionStart);
-				m_editor->putByte(byte);
+				m_editor->replaceByte(byte);
 				++m_selectionStart;
 				++m_selectionEnd;
 				repaint();

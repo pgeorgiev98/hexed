@@ -8,11 +8,10 @@ BufferedEditor::BufferedEditor(QFileDevice *device, QObject *parent)
 	: QObject(parent)
 	, m_device(device)
 	, m_sectionIndex(-1)
-	, m_localPosition(sectionSize)
-	, m_absolutePosition(0)
-	, m_section(m_sections.end())
-	, m_currentModificationIndex(0)
+	, m_sectionLocalPosition(0)
+	, m_position(0)
 	, m_size(device->size())
+	, m_currentModificationIndex(0)
 	, m_modificationCount(0)
 {
 }
@@ -24,24 +23,33 @@ QString BufferedEditor::errorString() const
 
 bool BufferedEditor::seek(qint64 position)
 {
-	int sectionIndex = int(position / sectionSize);
-	auto iterator = m_sections.find(sectionIndex);
-	if (iterator == m_sections.end()) {
-		iterator = loadSection(sectionIndex);
-		if (iterator == m_sections.end())
-			return false;
+	Q_ASSERT(position < m_size);
+
+	m_sectionIndex = getSectionIndex(position);
+	if (m_sectionIndex == -1)
+		return false;
+
+	m_position = position;
+
+	m_sectionLocalPosition = 0;
+	const Section &s = m_sections[m_sectionIndex];
+	int pos = int(position - s.currentPosition);
+	for (int i = 0; ; ++m_sectionLocalPosition) {
+		if (s.data[m_sectionLocalPosition].current) {
+			if (i == pos)
+				break;
+			else
+				++i;
+		}
 	}
 
-	m_section = iterator;
-	m_sectionIndex = sectionIndex;
-	m_localPosition = position % sectionSize;
-	m_absolutePosition = position;
+	m_sectionLocalPosition = int(position - m_sections[m_sectionIndex].currentPosition);
 	return true;
 }
 
 qint64 BufferedEditor::position() const
 {
-	return m_absolutePosition;
+	return m_position;
 }
 
 qint64 BufferedEditor::size() const
@@ -56,28 +64,37 @@ bool BufferedEditor::isEmpty() const
 
 bool BufferedEditor::atEnd() const
 {
-	return m_absolutePosition == m_device->size();
+	return m_position == m_device->size();
 }
 
-char BufferedEditor::getByte()
+void BufferedEditor::moveForward()
 {
-	if (m_localPosition == sectionSize) {
-		m_localPosition = 0;
-		m_section = getSection(++m_sectionIndex);
-		Q_ASSERT(m_section != m_sections.end());
+	if (m_position == m_size - 1)
+		return;
+
+	const Section &s = m_sections[m_sectionIndex];
+	for (;;) {
+		++m_sectionLocalPosition;
+		if (m_sectionLocalPosition == s.data.size()) {
+			seek(m_position + 1); // TODO: optimize this somehow
+			return;
+		}
+		if (s.data[m_sectionLocalPosition].current)
+			break;
 	}
-	++m_absolutePosition;
-	return m_section->data[m_localPosition++];
+	++m_position;
 }
 
-void BufferedEditor::putByte(char byte)
+BufferedEditor::Byte BufferedEditor::getByte()
 {
-	if (m_localPosition == sectionSize) {
-		m_localPosition = 0;
-		m_section = getSection(++m_sectionIndex);
-		Q_ASSERT(m_section != m_sections.end());
-	}
-	Section &section = *m_section;
+	auto byte = m_sections[m_sectionIndex].data[m_sectionLocalPosition];
+	moveForward();
+	return byte;
+}
+
+void BufferedEditor::replaceByte(char byte)
+{
+	Section &section = m_sections[m_sectionIndex];
 
 	bool couldRedo = canRedo();
 	if (couldRedo) {
@@ -85,20 +102,10 @@ void BufferedEditor::putByte(char byte)
 		Q_ASSERT(!canRedo());
 	}
 
-	if (m_localPosition == section.length) {
-		++section.length;
-		++m_size;
-		m_modifications.append(Insertion(byte, quint16(m_localPosition), m_sectionIndex));
-	} else {
-		m_modifications.append(Replacement(section.data[m_localPosition], byte, quint16(m_localPosition), m_sectionIndex));
-	}
-
-	section.data[m_localPosition++] = byte;
-	++section.modificationCount;
-
-	++m_modificationCount;
-	++m_absolutePosition;
-	++m_currentModificationIndex;
+	Modification m = Replacement(*section.data[m_sectionLocalPosition].current, byte, m_position);
+	doModification(m);
+	m_modifications.append(m);
+	m_currentModificationIndex = m_modifications.size();
 
 	Q_ASSERT(canUndo());
 	emit canUndoChanged(true);
@@ -109,22 +116,128 @@ void BufferedEditor::putByte(char byte)
 
 bool BufferedEditor::writeChanges()
 {
-	for (auto it = m_sections.begin(); it != m_sections.end(); ++it) {
-		Section &section = *it;
-		if (section.modificationCount) {
-			if (!m_device->seek(it.key()))
-				return false;
-			if (!m_device->write(section.data, section.length))
-				return false;
-			m_modificationCount -= section.modificationCount;
-			section.modificationCount = 0;
-		}
-	}
-	Q_ASSERT(m_modificationCount == 0);
-	// TODO: If resizing fails, isModified() returns false, should be true
-	if (m_device->size() != m_size)
+	// Increase the file size if needed
+	if (m_device->size() < m_size)
 		if (!m_device->resize(m_size))
 			return false;
+
+	// The UnchangedSection objects are sections of the file that are
+	// not modified or loaded into memory, but have to be *moved*
+	// to a different position in the file because of insertions
+	// or deletions that have happened in some loaded sections
+
+	// Those sections will be limited to a size of `sectionSize`
+	// to prevent high memory usage during the reallocation
+
+	struct UnchangedSection
+	{
+		qint64 oldPosition, newPosition;
+		int length;
+	};
+
+	QVector<UnchangedSection> unchangedSections;
+
+	// Make a list of the UnchangedSections
+	qint64 savedPosition = 0, currentPosition = 0;
+	Section dummySection(m_size, m_size); // Dummy end section
+	for (int i = 0; i <= m_sections.size(); ++i) {
+		const Section &section = i < m_sections.size() ? m_sections[i] : dummySection;
+		Q_ASSERT(savedPosition <= section.savedPosition);
+
+		if (savedPosition == section.savedPosition) {
+			savedPosition += section.savedLength();
+			currentPosition += section.currentLength();
+		} else {
+			// The length shouldn't be changed
+			Q_ASSERT(section.savedPosition - savedPosition == section.currentPosition - currentPosition);
+
+			qint64 length = section.savedPosition - savedPosition;
+			if (savedPosition != currentPosition) {
+				qint64 index = 0;
+				while (index < length) {
+					UnchangedSection s;
+					s.oldPosition = savedPosition + index;
+					s.newPosition = currentPosition + index;
+					s.length = int(qMin(qint64(sectionSize), length - index));
+					unchangedSections.append(s);
+					index += s.length;
+				}
+			}
+
+			savedPosition += length;
+			currentPosition += length;
+		}
+	}
+
+	// Sort them is such manner that the first sections in the list
+	// should be written first to the disk
+	std::sort(unchangedSections.begin(), unchangedSections.end(),
+		  // 'Less than' function, sorting is ascending
+		  [](const UnchangedSection &s1, const UnchangedSection &s2) -> bool {
+		// Return true when s1.old and s2.new are intersecting
+		// i.e. when s2 will be written over s1's space
+		return s2.newPosition < s1.oldPosition + s1.length &&
+				s2.newPosition + s2.length > s1.oldPosition;
+	});
+
+	qDebug() << unchangedSections.size() << "unchanged section have to be moved";
+	// Move those sections
+	for (int i = 0; i < unchangedSections.size(); ++i) {
+		UnchangedSection s = unchangedSections[i];
+		qDebug("Moving section %d/%d with a length of %d from %lld to %lld",
+			   i, unchangedSections.size() - 1,
+			   s.length, s.oldPosition, s.newPosition);
+
+		QVector<char> buffer(int(s.length));
+
+		if (!m_device->seek(s.oldPosition)) {
+			qCritical() << "BufferedEditor: Failed to seek in file:" << m_device->errorString();
+			return false;
+		}
+		qint64 bytesRead = m_device->read(buffer.data(), s.length);
+		if (bytesRead == -1) {
+			qCritical() << "Failed to read from file:" << m_device->errorString();
+			return false;
+		}
+		Q_ASSERT(bytesRead == s.length);
+
+		if (!m_device->seek(s.newPosition)) {
+			qCritical() << "BufferedEditor: Failed to seek in file:" << m_device->errorString();
+			return false;
+		}
+		qint64 bytesWritten = m_device->write(buffer.data(), s.length);
+		if (bytesWritten == -1) {
+			qCritical() << "Failed to write to file:" << m_device->errorString();
+			return false;
+		}
+		Q_ASSERT(bytesWritten == s.length);
+	}
+
+	// Write the modified sections
+	for (int i = 0; i < m_sections.size(); ++i) {
+		const Section &s = m_sections[i];
+		qDebug() << "S" << i << ":" << s.modificationCount;
+		if (s.isModified() || s.savedPosition != s.currentPosition) {
+			qDebug("Writing section %d (%d)", i, m_sections.size());
+			QVector<char> buffer;
+			for (Byte b : s.data)
+				if (b.current)
+					buffer.append(*b.current);
+
+			if (!m_device->seek(s.currentPosition)) {
+				qCritical() << "BufferedEditor: Failed to seek in file:" << m_device->errorString();
+				return false;
+			}
+
+			qint64 bytesWritten = m_device->write(buffer.data(), buffer.size());
+			if (bytesWritten == -1) {
+				qCritical() << "Failed to write to file:" << m_device->errorString();
+				return false;
+			}
+			Q_ASSERT(bytesWritten == buffer.size());
+		}
+	}
+
 	return true;
 }
 
@@ -148,21 +261,7 @@ void BufferedEditor::undo()
 	if (!canUndo())
 		return;
 
-	auto var = m_modifications[m_currentModificationIndex - 1];
-	if (std::holds_alternative<Replacement>(var)) {
-		Replacement replacement = std::get<Replacement>(var);
-		auto section = m_sections.find(replacement.sectionIndex);
-		section->data[replacement.localPosition] = replacement.before;
-		--section->modificationCount;
-	} else {
-		Insertion insertion = std::get<Insertion>(var);
-		auto section = m_sections.find(insertion.sectionIndex);
-		--section->length;
-		--section->modificationCount;
-		--m_size;
-		if (section->length == 0)
-			m_sections.erase(section);
-	}
+	undoModification(m_modifications[m_currentModificationIndex - 1]);
 
 	--m_modificationCount;
 	--m_currentModificationIndex;
@@ -178,19 +277,7 @@ void BufferedEditor::redo()
 	if (!canRedo())
 		return;
 
-	auto var = m_modifications[m_currentModificationIndex];
-	if (std::holds_alternative<Replacement>(var)) {
-		Replacement replacement = std::get<Replacement>(var);
-		auto section = m_sections.find(replacement.sectionIndex);
-		section->data[replacement.localPosition] = replacement.after;
-		++section->modificationCount;
-	} else {
-		Insertion insertion = std::get<Insertion>(var);
-		auto section = getSection(insertion.sectionIndex);
-		section->data[++section->length] = insertion.byte;
-		++section->modificationCount;
-		++m_size;
-	}
+	doModification(m_modifications[m_currentModificationIndex]);
 
 	++m_modificationCount;
 	++m_currentModificationIndex;
@@ -202,25 +289,128 @@ void BufferedEditor::redo()
 }
 
 
-QMap<int, BufferedEditor::Section>::iterator BufferedEditor::loadSection(int sectionIndex)
+int BufferedEditor::getSectionIndex(qint64 position)
 {
-	Q_ASSERT(!m_sections.contains(sectionIndex));
-	Section section;
-	qint64 startByte = sectionIndex * sectionSize;
-	if (!m_device->seek(startByte)) {
-		// TODO
-		qDebug() << "Failed to read from device: " << m_device->errorString();
-		return m_sections.end();
+	// The index of the section
+	int index = -1;
+	// The index of the next/previous section if such is loaded and the section was not found
+	int nextIndex = -1, prevIndex = -1;
+
+	// Find the needed section
+	// TODO: Maybe use binary search or at least optimize for sequential access
+	for (int i = 0; i < m_sections.size(); ++i) {
+		const Section &section = m_sections[i];
+		if (section.currentPosition > position) {
+			nextIndex = i;
+			break;
+		}
+		if (position >= section.currentPosition &&
+				position < section.currentPosition + section.currentLength()) {
+			index = i;
+			break;
+		}
+		prevIndex = i;
 	}
 
-	section.length = int(m_device->read(section.data, sectionSize));
-	return m_sections.insert(sectionIndex, std::move(section));
+	if (index == -1) {
+		// Section is not loaded in memory
+		qDebug() << "BufferedEditor: Loading section for byte" << position;
+
+		// The location of `position` in the actual, unedited file
+		qint64 realPosition = position;
+		qint64 prevSectionSavedEnd = 0;
+		if (prevIndex != -1) {
+			prevSectionSavedEnd = m_sections[prevIndex].savedPosition + m_sections[prevIndex].savedLength();
+			qint64 prevSectionCurrentEnd = m_sections[prevIndex].currentPosition + m_sections[prevIndex].currentLength();
+			realPosition = prevSectionSavedEnd + position - prevSectionCurrentEnd;
+		}
+
+		// The maximum allowed 'end' of the section that is to be loaded
+		qint64 newSectionMaxEnd;
+		if (nextIndex != -1) {
+			// Don't overlap with the next section
+			newSectionMaxEnd = m_sections[nextIndex].savedPosition;
+		} else {
+			// Don't try to read after the end of the file
+			newSectionMaxEnd = m_device->size();
+		}
+
+		// Calculate the new section start/end positions
+		qint64 newSectionStart = realPosition;
+		qint64 newSectionEnd = newSectionMaxEnd;
+		if (newSectionMaxEnd - realPosition < sectionSize)
+			newSectionStart = qMax(newSectionMaxEnd - sectionSize, prevSectionSavedEnd);
+		else
+			newSectionEnd = newSectionStart + sectionSize;
+		int newSectionLength = int(newSectionEnd - newSectionStart);
+
+		// Create the section object
+		Section section(newSectionStart, newSectionStart + position - realPosition);
+		section.data.resize(newSectionLength);
+
+		// Seek the file to the required position
+		if (!m_device->seek(newSectionStart)) {
+			qCritical() << "BufferedEditor: Failed to seek in file:" << m_device->errorString();
+			return -1;
+		}
+
+		// Read the data from the file
+		QVector<char> buffer(newSectionLength);
+		qint64 bytesRead = m_device->read(buffer.data(), newSectionLength);
+		if (bytesRead == -1) {
+			qCritical() << "BufferedEditor: Failed to write to file:" << m_device->errorString();
+			return -1;
+		}
+		Q_ASSERT(bytesRead == newSectionLength);
+		for (int i = 0; i < newSectionLength; ++i) {
+			char b = buffer[i];
+			section.data[i] = Byte(b, b);
+		}
+
+		qDebug() << "Loaded from" << section.currentPosition << newSectionLength << "bytes";
+
+		// Add the new section to the list of loaded sections
+		index = nextIndex == -1 ? m_sections.size() : nextIndex;
+		m_sections.insert(index, std::move(section));
+	}
+
+	return index;
 }
 
-QMap<int, BufferedEditor::Section>::iterator BufferedEditor::getSection(int sectionIndex)
+void BufferedEditor::doModification(Modification modification)
 {
-	auto iterator = m_sections.find(sectionIndex);
-	if (iterator == m_sections.end())
-		iterator = loadSection(sectionIndex);
-	return iterator;
+	if (std::holds_alternative<Replacement>(modification)) {
+		Replacement replacement = std::get<Replacement>(modification);
+		int sectionIndex = getSectionIndex(replacement.position);
+		if (sectionIndex == -1)
+			return;
+		Section &section = m_sections[sectionIndex];
+		int localPosition = int(replacement.position - section.currentPosition);
+		section.data[localPosition].current = replacement.after;
+		++section.modificationCount;
+
+	} else if (std::holds_alternative<Insertion>(modification)) {
+		// TODO
+	}
+
+	++m_modificationCount;
+}
+
+void BufferedEditor::undoModification(Modification modification)
+{
+	if (std::holds_alternative<Replacement>(modification)) {
+		Replacement replacement = std::get<Replacement>(modification);
+		int sectionIndex = getSectionIndex(replacement.position);
+		if (sectionIndex == -1)
+			return;
+		Section &section = m_sections[sectionIndex];
+		int localPosition = int(replacement.position - section.currentPosition);
+		section.data[localPosition].current = replacement.before;
+		--section.modificationCount;
+
+	} else if (std::holds_alternative<Insertion>(modification)) {
+		// TODO
+	}
+
+	--m_modificationCount;
 }
