@@ -23,6 +23,7 @@ static QColor backgroundColor("#ffffff");
 static QColor alternateBackgroundColor("#aaaaaa");
 static QColor textColor("#000000");
 static QColor hoverTextColor("#ff0000");
+static QColor modifiedTextColor("#ff0000");
 static QColor selectedColor("#0000ff");
 static QColor selectedTextColor("#000000");
 
@@ -214,6 +215,7 @@ bool HexView::saveChanges()
 	if (!ok)
 		QMessageBox::critical(this, "",
 							  QString("Failed to save file %1: %2").arg(m_file.fileName()).arg(m_editor->errorString()));
+	repaint();
 	return ok;
 }
 
@@ -292,7 +294,9 @@ void HexView::paintEvent(QPaintEvent *event)
 						 QString::number(m_editor->position(), 16).rightJustified(lineNumberDigitsCount(), '0'));
 
 		for (int x = 0; i < m_editor->size() && x < m_bytesPerLine; ++x, ++i) {
-			unsigned char byte = static_cast<unsigned char>(*m_editor->getByte().current);
+			BufferedEditor::Byte b = m_editor->getByte();
+			bool isModified = b.saved != b.current;
+			unsigned char byte = static_cast<unsigned char>(*b.current);
 			cellText[0] = hexTable[(byte >> 4) & 0xF];
 			cellText[1] = hexTable[(byte >> 0) & 0xF];
 			ch[0] = (byte >= 32 && byte <= 126) ? char(byte) : '.';
@@ -332,7 +336,9 @@ void HexView::paintEvent(QPaintEvent *event)
 								 m_cellSize + m_cellPadding - 1);
 			}
 
-			if (m_hoveredIndex == i)
+			if (isModified)
+				painter.setPen(modifiedTextColor);
+			else if (m_hoveredIndex == i)
 				painter.setPen(hoverTextColor);
 			else
 				painter.setPen(textColor);
