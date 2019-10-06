@@ -84,7 +84,7 @@ private:
 	QScrollBar *m_verticalScrollBar;
 	qint64 m_scrollTopRow;
 	double m_mouseScrollBuffer;
-	int m_editingCell;
+	bool m_editingCell;
 	char m_editingCellByte;
 
 	int getHoverCell(const QPoint &mousePos) const;

@@ -54,7 +54,7 @@ HexView::HexView(QWidget *parent)
 	, m_verticalScrollBar(new QScrollBar(this))
 	, m_scrollTopRow(0)
 	, m_mouseScrollBuffer(0.0)
-	, m_editingCell(-1)
+	, m_editingCell(false)
 	, m_editingCellByte(0x00)
 {
 	m_verticalScrollBar->resize(QApplication::style()->pixelMetric(QStyle::PM_ScrollBarExtent), height());
@@ -326,7 +326,7 @@ void HexView::paintEvent(QPaintEvent *event)
 								 m_characterWidth + 4,
 								 m_fontMetrics.height() + 4);
 
-				if (m_editingCell == i) {
+				if (m_editingCell && i >= m_selectionStart && i <= m_selectionEnd) {
 					painter.setPen(textColor);
 					painter.setBrush(backgroundColor);
 				}
@@ -343,7 +343,7 @@ void HexView::paintEvent(QPaintEvent *event)
 			else
 				painter.setPen(textColor);
 
-			if (m_editingCell != i)
+			if (!(m_editingCell && i >= m_selectionStart && i <= m_selectionEnd))
 				painter.drawText(cellCoord, cellText);
 			else
 				painter.drawText(cellCoord.x() + m_characterWidth / 2, cellCoord.y(),
@@ -399,7 +399,7 @@ void HexView::mouseMoveEvent(QMouseEvent *event)
 
 void HexView::mousePressEvent(QMouseEvent *event)
 {
-	m_editingCell = -1;
+	m_editingCell = false;
 
 	if (event->button() == Qt::RightButton) {
 		int selectionStart = -1;
@@ -496,7 +496,7 @@ void HexView::mouseReleaseEvent(QMouseEvent *)
 
 void HexView::mouseDoubleClickEvent(QMouseEvent *event)
 {
-	m_editingCell = -1;
+	m_editingCell = false;
 
 	int hoverCellIndex = getHoverCell(event->pos());
 	int hoverTextIndex = getHoverText(event->pos());
@@ -536,7 +536,7 @@ void HexView::wheelEvent(QWheelEvent *event)
 
 void HexView::keyPressEvent(QKeyEvent *event)
 {
-	if (m_selecting || m_selectionStart != m_selectionEnd) {
+	if (m_selecting || m_selectionStart == -1 || m_selectionStart >= m_editor->size()) {
 		QWidget::keyPressEvent(event);
 		return;
 	}
@@ -548,9 +548,12 @@ void HexView::keyPressEvent(QKeyEvent *event)
 	};
 	bool keyIsHexDigit = hexDigits.contains(key);
 	auto putByte = [this]() {
-		m_editor->seek(m_editingCell);
-		m_editor->replaceByte(m_editingCellByte);
-		m_editingCell = -1;
+		m_editor->seek(m_selectionStart);
+		while (m_editor->position() <= m_selectionEnd) {
+			m_editor->replaceByte(m_editingCellByte);
+			m_editor->moveForward();
+		}
+		m_editingCell = false;
 	};
 
 	static const QSet<int> movingKeys = {
@@ -560,8 +563,8 @@ void HexView::keyPressEvent(QKeyEvent *event)
 
 	if (m_selection == Selection::Cells) {
 		if (keyIsHexDigit) {
-			if (m_editingCell == -1) {
-				m_editingCell = m_selectionStart;
+			if (!m_editingCell) {
+				m_editingCell = true;
 				m_editingCellByte = char(QString(char(key)).toInt(nullptr, 16));
 				repaint();
 				return;
@@ -569,14 +572,16 @@ void HexView::keyPressEvent(QKeyEvent *event)
 				m_editingCellByte <<= 4;
 				m_editingCellByte |= char(QString(char(key)).toInt(nullptr, 16));
 				putByte();
-				++m_selectionStart;
-				++m_selectionEnd;
+				if (m_selectionStart == m_selectionEnd) {
+					++m_selectionStart;
+					++m_selectionEnd;
+				}
 				repaint();
 				return;
 			}
 		} else if (key == Qt::Key_Escape) {
-			if (m_editingCell != -1) {
-				m_editingCell = -1;
+			if (m_editingCell) {
+				m_editingCell = false;
 				repaint();
 				return;
 			}
@@ -587,9 +592,14 @@ void HexView::keyPressEvent(QKeyEvent *event)
 			char byte = text[0].toLatin1();
 			if (byte >= 32 && byte < 127) {
 				m_editor->seek(m_selectionStart);
-				m_editor->replaceByte(byte);
-				++m_selectionStart;
-				++m_selectionEnd;
+				while (m_editor->position() <= m_selectionEnd) {
+					m_editor->replaceByte(byte);
+					m_editor->moveForward();
+				}
+				if (m_selectionStart == m_selectionEnd) {
+					++m_selectionStart;
+					++m_selectionEnd;
+				}
 				repaint();
 				return;
 			}
@@ -597,7 +607,7 @@ void HexView::keyPressEvent(QKeyEvent *event)
 	}
 
 	if (movingKeys.contains(key)) {
-		if (m_editingCell != -1)
+		if (m_editingCell)
 			putByte();
 		int move = 0;
 		switch (key) {
@@ -612,10 +622,12 @@ void HexView::keyPressEvent(QKeyEvent *event)
 		case Qt::Key_Down:
 			move = m_bytesPerLine; break;
 		}
-		m_selectionStart = qBound(0, m_selectionStart + move, int(m_editor->size() - 1)); // TODO: qint64
-		m_selectionEnd = m_selectionStart;
-		repaint();
-		return;
+		if (m_selectionStart == m_selectionEnd) {
+			m_selectionStart = qBound(0, m_selectionStart + move, int(m_editor->size() - 1)); // TODO: qint64
+			m_selectionEnd = m_selectionStart;
+			repaint();
+			return;
+		}
 	}
 
 	QWidget::keyPressEvent(event);
