@@ -23,7 +23,12 @@ QString BufferedEditor::errorString() const
 
 bool BufferedEditor::seek(qint64 position)
 {
-	Q_ASSERT(position < m_size);
+	if (position == m_size) {
+		m_sectionIndex = -1;
+		m_sectionLocalPosition = 0;
+		m_position = m_size;
+		return true;
+	}
 
 	m_sectionIndex = getSectionIndex(position);
 	if (m_sectionIndex == -1)
@@ -69,7 +74,7 @@ bool BufferedEditor::atEnd() const
 
 void BufferedEditor::moveForward()
 {
-	if (m_position == m_size - 1)
+	if (atEnd())
 		return;
 
 	const Section &s = m_sections[m_sectionIndex];
