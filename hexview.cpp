@@ -117,7 +117,7 @@ std::optional<HexView::ByteSelection> HexView::selection() const
 
 qint64 HexView::rowCount() const
 {
-	return m_editor->size() / m_bytesPerLine + (m_editor->size() % m_bytesPerLine > 0);
+	return (m_editor->size() + 1) / m_bytesPerLine + ((m_editor->size() + 1) % m_bytesPerLine > 0);
 }
 
 bool HexView::canUndo() const
@@ -281,7 +281,7 @@ void HexView::paintEvent(QPaintEvent *event)
 	if (i >= m_editor->size())
 		return;
 	m_editor->seek(i);
-	for (int y = startY, yCoord = m_cellSize; i < m_editor->size() && y < endY; ++y, yCoord += cellHeight) {
+	for (int y = startY, yCoord = m_cellSize; i <= m_editor->size() && y < endY; ++y, yCoord += cellHeight) {
 
 		bool rowIsHovered = m_hoveredIndex == -1 ? false : m_hoveredIndex / 16 == y;
 
@@ -293,14 +293,7 @@ void HexView::paintEvent(QPaintEvent *event)
 		painter.drawText(QPointF(m_cellSize / 2, yCoord),
 						 QString::number(m_editor->position(), 16).rightJustified(lineNumberDigitsCount(), '0'));
 
-		for (int x = 0; i < m_editor->size() && x < m_bytesPerLine; ++x, ++i) {
-			BufferedEditor::Byte b = m_editor->getByte();
-			bool isModified = b.saved != b.current;
-			unsigned char byte = static_cast<unsigned char>(*b.current);
-			cellText[0] = hexTable[(byte >> 4) & 0xF];
-			cellText[1] = hexTable[(byte >> 0) & 0xF];
-			ch[0] = (byte >= 32 && byte <= 126) ? char(byte) : '.';
-
+		for (int x = 0; i <= m_editor->size() && x < m_bytesPerLine; ++x, ++i) {
 			QPoint cellCoord;
 			cellCoord.setX(cellX(x));
 			cellCoord.setY(yCoord);
@@ -336,19 +329,29 @@ void HexView::paintEvent(QPaintEvent *event)
 								 m_cellSize + m_cellPadding - 1);
 			}
 
-			if (isModified)
-				painter.setPen(modifiedTextColor);
-			else if (m_hoveredIndex == i)
-				painter.setPen(hoverTextColor);
-			else
-				painter.setPen(textColor);
+			if (!m_editor->atEnd()) {
+				BufferedEditor::Byte b = m_editor->getByte();
+				bool isModified = b.saved != b.current;
+				unsigned char byte = static_cast<unsigned char>(*b.current);
+				cellText[0] = hexTable[(byte >> 4) & 0xF];
+				cellText[1] = hexTable[(byte >> 0) & 0xF];
+				ch[0] = (byte >= 32 && byte <= 126) ? char(byte) : '.';
 
-			if (!(m_editingCell && i >= m_selectionStart && i <= m_selectionEnd))
-				painter.drawText(cellCoord, cellText);
-			else
-				painter.drawText(cellCoord.x() + m_characterWidth / 2, cellCoord.y(),
-								 QString::number(m_editingCellByte, 16).toUpper());
-			painter.drawText(textCoord, ch);
+
+				if (isModified)
+					painter.setPen(modifiedTextColor);
+				else if (m_hoveredIndex == i)
+					painter.setPen(hoverTextColor);
+				else
+					painter.setPen(textColor);
+
+				if (!(m_editingCell && i >= m_selectionStart && i <= m_selectionEnd))
+					painter.drawText(cellCoord, cellText);
+				else
+					painter.drawText(cellCoord.x() + m_characterWidth / 2, cellCoord.y(),
+									 QString::number(m_editingCellByte, 16).toUpper());
+				painter.drawText(textCoord, ch);
+			}
 		}
 	}
 
@@ -377,19 +380,21 @@ void HexView::mouseMoveEvent(QMouseEvent *event)
 	if (newIndex != m_hoveredIndex) {
 		m_hoveredIndex = newIndex;
 
-		if (m_hoveredIndex != -1) {
-			if (m_selecting) {
-				if (newIndex == hoverCellIndex && (m_selection == Selection::Cells || m_selection == Selection::CellRows)) {
-					if (m_selection == Selection::Cells)
-						m_selectionEnd = m_hoveredIndex;
-					else if (m_selection == Selection::CellRows)
-						m_selectionEnd = m_bytesPerLine * (m_hoveredIndex / m_bytesPerLine) + m_bytesPerLine - 1;
-				} else if (newIndex == hoverTextIndex && (m_selection == Selection::Text || m_selection == Selection::TextRows)) {
-					if (m_selection == Selection::Text)
-						m_selectionEnd = m_hoveredIndex;
-					else if (m_selection == Selection::TextRows)
-						m_selectionEnd = m_bytesPerLine * (m_hoveredIndex / m_bytesPerLine) + m_bytesPerLine - 1;
-				}
+		if (m_hoveredIndex != -1 && m_selecting) {
+			if (m_selectionStart == m_editor->size()) {
+				// We can't selecting when starting with the EOF "byte"
+				m_selectionEnd = m_selectionStart;
+			} else {
+				if ((newIndex == hoverCellIndex && m_selection == Selection::Cells) ||
+						(newIndex == hoverTextIndex && m_selection == Selection::Text))
+					m_selectionEnd = m_hoveredIndex;
+				else if ((newIndex == hoverCellIndex && m_selection == Selection::CellRows) ||
+						 (newIndex == hoverTextIndex && m_selection == Selection::TextRows))
+					m_selectionEnd = m_bytesPerLine * (m_hoveredIndex / m_bytesPerLine) + m_bytesPerLine - 1;
+
+				// Don't allow to select past the last byte in the file
+				if (m_selectionEnd >= m_editor->size())
+					m_selectionEnd = m_editor->size() - 1;
 			}
 		}
 
@@ -660,11 +665,11 @@ int HexView::getHoverCell(const QPoint &mousePos) const
 	if (x >= 0 && x < m_bytesPerLine * (m_cellPadding + m_cellSize))
 		xi = x / (m_cellPadding + m_cellSize);
 
-	if (y >= 0 && y < m_editor->size() * (m_cellPadding + m_cellSize))
+	if (y >= 0 && y <= m_editor->size() * (m_cellPadding + m_cellSize))
 		yi = y / (m_cellPadding + m_cellSize);
 
 	if (xi != -1 && yi != -1)
-		return xi + m_bytesPerLine * yi;
+		return qMin(xi + m_bytesPerLine * yi, int(m_editor->size()));
 
 	return -1;
 }
@@ -681,11 +686,11 @@ int HexView::getHoverText(const QPoint &mousePos) const
 	int xi = -1, yi = -2;
 	if (x >= 0 && x < (m_characterWidth + 5) * m_bytesPerLine)
 		xi = x / (m_characterWidth + 5);
-	if (y >= 0 && y < m_editor->size() * (m_cellPadding + m_cellSize))
+	if (y >= 0 && y <= m_editor->size() * (m_cellPadding + m_cellSize))
 		yi = y / (m_cellPadding + m_cellSize);
 
 	if (xi != -1 && yi != -1)
-		return xi + m_bytesPerLine * yi;
+		return qMin(xi + m_bytesPerLine * yi, int(m_editor->size()));
 
 	return -1;
 }
