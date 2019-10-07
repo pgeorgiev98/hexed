@@ -69,7 +69,7 @@ bool BufferedEditor::isEmpty() const
 
 bool BufferedEditor::atEnd() const
 {
-	return m_position == m_device->size();
+	return m_position == m_size;
 }
 
 void BufferedEditor::moveForward()
@@ -119,8 +119,31 @@ void BufferedEditor::replaceByte(char byte)
 		emit canRedoChanged(false);
 }
 
+void BufferedEditor::insertByte(char byte)
+{
+	bool couldRedo = canRedo();
+	if (couldRedo) {
+		m_modifications.remove(m_currentModificationIndex, m_modifications.size() - m_currentModificationIndex);
+		Q_ASSERT(!canRedo());
+	}
+
+	Modification m = Insertion(byte, m_position);
+	doModification(m);
+	m_modifications.append(m);
+	m_currentModificationIndex = m_modifications.size();
+
+	Q_ASSERT(canUndo());
+	emit canUndoChanged(true);
+
+	if (couldRedo)
+		emit canRedoChanged(false);
+}
+
 bool BufferedEditor::writeChanges()
 {
+	// Needed for the dummy section
+	qint64 oldFileSize = m_device->size();
+
 	// Increase the file size if needed
 	if (m_device->size() < m_size)
 		if (!m_device->resize(m_size))
@@ -144,7 +167,7 @@ bool BufferedEditor::writeChanges()
 
 	// Make a list of the UnchangedSections
 	qint64 savedPosition = 0, currentPosition = 0;
-	Section dummySection(m_size, m_size); // Dummy end section
+	Section dummySection(oldFileSize, m_size); // Dummy end section
 	for (int i = 0; i <= m_sections.size(); ++i) {
 		const Section &section = i < m_sections.size() ? m_sections[i] : dummySection;
 		Q_ASSERT(savedPosition <= section.savedPosition);
@@ -401,7 +424,19 @@ void BufferedEditor::doModification(Modification modification)
 		++section.modificationCount;
 
 	} else if (std::holds_alternative<Insertion>(modification)) {
-		// TODO
+		Insertion insertion = std::get<Insertion>(modification);
+		if (insertion.position == m_size) {
+			// Insert at the end of the file
+			int sectionIndex = getSectionIndex(m_size - 1);
+			Q_ASSERT(sectionIndex != -1);
+			Section &section = m_sections[sectionIndex];
+			section.data.append(Byte(std::optional<char>(), insertion.byte));
+			++section.modificationCount;
+			++m_size;
+			m_position = m_size;
+		} else {
+			// TODO: partial implementation
+		}
 	}
 
 	++m_modificationCount;
@@ -420,7 +455,19 @@ void BufferedEditor::undoModification(Modification modification)
 		--section.modificationCount;
 
 	} else if (std::holds_alternative<Insertion>(modification)) {
-		// TODO
+		Insertion insertion = std::get<Insertion>(modification);
+		if (insertion.position == m_size - 1) {
+			// Remove the last byte
+			int sectionIndex = getSectionIndex(m_size - 1);
+			Q_ASSERT(sectionIndex != -1);
+			Section &section = m_sections[sectionIndex];
+			section.data.removeLast();
+			--section.modificationCount;
+			--m_size;
+			m_position = m_size;
+		} else {
+			// TODO: partial implementation
+		}
 	}
 
 	--m_modificationCount;

@@ -329,13 +329,18 @@ void HexView::paintEvent(QPaintEvent *event)
 								 m_cellSize + m_cellPadding - 1);
 			}
 
-			if (!m_editor->atEnd()) {
-				BufferedEditor::Byte b = m_editor->getByte();
-				bool isModified = b.saved != b.current;
-				unsigned char byte = static_cast<unsigned char>(*b.current);
-				cellText[0] = hexTable[(byte >> 4) & 0xF];
-				cellText[1] = hexTable[(byte >> 0) & 0xF];
-				ch[0] = (byte >= 32 && byte <= 126) ? char(byte) : '.';
+			bool editingLast = m_editingCell && m_selectionStart == m_editor->size();
+			if (!m_editor->atEnd() || editingLast) {
+				bool isModified = false;
+				unsigned char byte;
+				if (!m_editor->atEnd()) {
+					BufferedEditor::Byte b = m_editor->getByte();
+					isModified = b.saved != b.current;
+					byte = static_cast<unsigned char>(*b.current);
+					cellText[0] = hexTable[(byte >> 4) & 0xF];
+					cellText[1] = hexTable[(byte >> 0) & 0xF];
+					ch[0] = (byte >= 32 && byte <= 126) ? char(byte) : '.';
+				}
 
 
 				if (isModified)
@@ -541,7 +546,7 @@ void HexView::wheelEvent(QWheelEvent *event)
 
 void HexView::keyPressEvent(QKeyEvent *event)
 {
-	if (m_selecting || m_selectionStart == -1 || m_selectionStart >= m_editor->size()) {
+	if (m_selecting || m_selectionStart == -1) {
 		QWidget::keyPressEvent(event);
 		return;
 	}
@@ -554,9 +559,13 @@ void HexView::keyPressEvent(QKeyEvent *event)
 	bool keyIsHexDigit = hexDigits.contains(key);
 	auto putByte = [this]() {
 		m_editor->seek(m_selectionStart);
-		while (m_editor->position() <= m_selectionEnd) {
-			m_editor->replaceByte(m_editingCellByte);
-			m_editor->moveForward();
+		if (m_editor->atEnd()) {
+			m_editor->insertByte(m_editingCellByte);
+		} else {
+			while (m_editor->position() <= m_selectionEnd) {
+				m_editor->replaceByte(m_editingCellByte);
+				m_editor->moveForward();
+			}
 		}
 		m_editingCell = false;
 	};
@@ -597,9 +606,13 @@ void HexView::keyPressEvent(QKeyEvent *event)
 			char byte = text[0].toLatin1();
 			if (byte >= 32 && byte < 127) {
 				m_editor->seek(m_selectionStart);
-				while (m_editor->position() <= m_selectionEnd) {
-					m_editor->replaceByte(byte);
-					m_editor->moveForward();
+				if (m_editor->atEnd()) {
+					m_editor->insertByte(byte);
+				} else {
+					while (m_editor->position() <= m_selectionEnd) {
+						m_editor->replaceByte(byte);
+						m_editor->moveForward();
+					}
 				}
 				if (m_selectionStart == m_selectionEnd) {
 					++m_selectionStart;

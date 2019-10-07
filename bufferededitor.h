@@ -38,7 +38,7 @@ public:
 	void moveForward();
 	Byte getByte();
 	void replaceByte(char byte);
-	// TODO: void insertByte(char byte);
+	void insertByte(char byte);
 	bool writeChanges();
 	bool isModified() const;
 	bool canUndo() const;
