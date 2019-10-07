@@ -384,7 +384,7 @@ void HexView::mouseMoveEvent(QMouseEvent *event)
 						m_selectionEnd = m_hoveredIndex;
 					else if (m_selection == Selection::CellRows)
 						m_selectionEnd = m_bytesPerLine * (m_hoveredIndex / m_bytesPerLine) + m_bytesPerLine - 1;
-			} else if (newIndex == hoverTextIndex && (m_selection == Selection::Text || m_selection == Selection::TextRows)) {
+				} else if (newIndex == hoverTextIndex && (m_selection == Selection::Text || m_selection == Selection::TextRows)) {
 					if (m_selection == Selection::Text)
 						m_selectionEnd = m_hoveredIndex;
 					else if (m_selection == Selection::TextRows)
