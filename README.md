@@ -5,12 +5,22 @@
 An open-source, cross-platform binary file hex editor written in C++ with Qt5.
 
 ## Features
-- Displays both the hex and ascii values of the bytes
-- Loads only the parts of the file that are needed in memory
-- Can have many files open at once in tabs
-- Undo and redo functionality
+- [x] Displays both the hex and ascii values of the bytes
+- [x] Loads only the parts of the file that are needed in memory
+- [x] Can have many files open at once in tabs
+- [x] Can replace bytes and append bytes to the file
+- [ ] Can insert bytes at any position in the file
+- [ ] Can delete bytes at any position in the file
+- [x] Supports both hex and ascii keyboard input
+- [ ] Can search the file
+- [x] Has undo and redo functionality
+- [ ] Can compare binary files side by side
 
-And that's pretty much it :)
+Be aware that this is in a pretty early stage of development and is just a hobby project of mine,
+so **I cannot give any guarantees that you will not lose your data**.
+And, of course, any feedback for such issues is greatly appreciated.
+
+You've been warned.
 
 ## Installing from source
 
