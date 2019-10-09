@@ -1,4 +1,5 @@
 #include "hexview.h"
+#include "gotodialog.h"
 
 #include <QPainter>
 #include <QPaintEvent>
@@ -56,6 +57,7 @@ HexView::HexView(QWidget *parent)
 	, m_mouseScrollBuffer(0.0)
 	, m_editingCell(false)
 	, m_editingCellByte(0x00)
+	, m_gotoDialog(new GotoDialog(this))
 {
 	m_verticalScrollBar->resize(QApplication::style()->pixelMetric(QStyle::PM_ScrollBarExtent), height());
 	connect(m_verticalScrollBar, &QAbstractSlider::valueChanged, this, &HexView::setVerticalScrollPosition);
@@ -75,6 +77,7 @@ HexView::HexView(QWidget *parent)
 	setMinimumHeight(80);
 	setMouseTracking(true);
 	setFocusPolicy(Qt::WheelFocus);
+
 }
 
 QString HexView::toPlainText()
@@ -246,6 +249,24 @@ void HexView::undo()
 void HexView::redo()
 {
 	m_editor->redo();
+	repaint();
+}
+
+void HexView::openGotoDialog()
+{
+	m_gotoDialog->setMaximum(m_editor->size());
+	if (!m_gotoDialog->exec())
+		return;
+
+	qint64 position = m_gotoDialog->position();
+	m_selecting = false;
+	if (m_selection == Selection::Text || m_selection == Selection::TextRows)
+		m_selection = Selection::Text;
+	else
+		m_selection = Selection::Cells;
+	m_selectionStart = m_selectionEnd = position;
+	setVerticalScrollPosition(position / m_bytesPerLine);
+
 	repaint();
 }
 

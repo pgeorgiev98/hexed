@@ -13,6 +13,8 @@
 
 #include <optional>
 
+class GotoDialog;
+
 class QScrollBar;
 
 class HexView : public QWidget
@@ -50,6 +52,7 @@ public slots:
 	bool quit();
 	void undo();
 	void redo();
+	void openGotoDialog();
 
 protected:
 	void paintEvent(QPaintEvent *) override;
@@ -86,6 +89,8 @@ private:
 	double m_mouseScrollBuffer;
 	bool m_editingCell;
 	char m_editingCellByte;
+
+	GotoDialog *m_gotoDialog;
 
 	int getHoverCell(const QPoint &mousePos) const;
 	int getHoverText(const QPoint &mousePos) const;

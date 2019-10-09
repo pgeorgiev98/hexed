@@ -19,6 +19,7 @@ MainWindow::MainWindow(QWidget *parent)
 	, m_exitAction(new QAction("&Exit"))
 	, m_undoAction(new QAction("&Undo"))
 	, m_redoAction(new QAction("&Redo"))
+	, m_gotoAction(new QAction("&Go to"))
 {
 	setCentralWidget(m_tabWidget);
 	resize(640, 480);
@@ -31,6 +32,7 @@ MainWindow::MainWindow(QWidget *parent)
 	m_exitAction->setShortcut(QKeySequence::Quit);
 	m_undoAction->setShortcut(QKeySequence::Undo);
 	m_redoAction->setShortcut(QKeySequence::Redo);
+	m_gotoAction->setShortcut(QKeySequence(Qt::CTRL + Qt::Key_G));
 
 	m_fileMenu->addAction(m_openAction);
 	m_fileMenu->addAction(m_saveAction);
@@ -38,6 +40,8 @@ MainWindow::MainWindow(QWidget *parent)
 
 	m_editMenu->addAction(m_undoAction);
 	m_editMenu->addAction(m_redoAction);
+	m_editMenu->addSeparator();
+	m_editMenu->addAction(m_gotoAction);
 
 	menuBar()->addMenu(m_fileMenu);
 	menuBar()->addMenu(m_editMenu);
@@ -47,6 +51,7 @@ MainWindow::MainWindow(QWidget *parent)
 	connect(m_exitAction, &QAction::triggered, this, &MainWindow::onExitClicked);
 	connect(m_undoAction, &QAction::triggered, this, &MainWindow::undo);
 	connect(m_redoAction, &QAction::triggered, this, &MainWindow::redo);
+	connect(m_gotoAction, &QAction::triggered, this, &MainWindow::openGotoDialog);
 
 	onTabCountChanged();
 }
@@ -120,11 +125,19 @@ void MainWindow::redo()
 	tab->redo();
 }
 
+void MainWindow::openGotoDialog()
+{
+	HexView *tab = qobject_cast<HexView *>(m_tabWidget->currentWidget());
+	Q_ASSERT(tab);
+	tab->openGotoDialog();
+}
+
 
 void MainWindow::onTabCountChanged()
 {
 	bool hasTabs = m_tabWidget->count() > 0;
 	m_saveAction->setEnabled(hasTabs);
+	m_gotoAction->setEnabled(hasTabs);
 	onCanUndoChanged();
 	onCanRedoChanged();
 }

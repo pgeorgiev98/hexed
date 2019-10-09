@@ -1,4 +1,4 @@
-QT += core gui widgets
+QT += core gui widgets script
 
 TARGET = hexed
 TEMPLATE = app
@@ -18,12 +18,16 @@ CONFIG += c++17
 
 SOURCES += \
         bufferededitor.cpp \
+        expressionvalidator.cpp \
+        gotodialog.cpp \
         hexview.cpp \
         main.cpp \
         mainwindow.cpp
 
 HEADERS += \
         bufferededitor.h \
+        expressionvalidator.h \
+        gotodialog.h \
         hexview.h \
         mainwindow.h
 
