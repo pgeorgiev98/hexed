@@ -270,6 +270,8 @@ bool BufferedEditor::writeChanges()
 		}
 	}
 
+	m_device->flush();
+
 	m_modificationCount = 0;
 
 	return true;
