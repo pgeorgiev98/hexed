@@ -39,6 +39,7 @@ public:
 	Byte getByte();
 	void replaceByte(char byte);
 	void insertByte(char byte);
+	void deleteByte();
 	bool writeChanges();
 	bool isModified() const;
 	bool canUndo() const;
@@ -81,6 +82,23 @@ private:
 			return l;
 		}
 
+		int bytePosition(qint64 position) const
+		{
+			qint64 p = currentPosition;
+			int i = 0;
+			if (p > position)
+				return -1;
+			for (Byte b : data) {
+				if (p == position && b.current.has_value())
+					break;
+				p += b.current.has_value();
+				++i;
+			}
+			if (i == data.size())
+				return -1;
+			return i;
+		}
+
 		Section() : savedPosition(-1), currentPosition(-1), modificationCount(0) {}
 		Section(qint64 savedPosition, qint64 currentPosition)
 			: savedPosition(savedPosition), currentPosition(currentPosition), modificationCount(0) {}
@@ -106,9 +124,19 @@ private:
 			: byte(byte), position(position) {}
 	};
 
+	struct Deletion
+	{
+		char before;
+		qint64 position;
+
+		Deletion() {}
+		Deletion(char before, qint64 position)
+			: before(before), position(position) {}
+	};
+
 	// TODO: Add Deletion
 
-	typedef std::variant<Replacement, Insertion> Modification;
+	typedef std::variant<Replacement, Insertion, Deletion> Modification;
 
 	QFileDevice *m_device;
 	QVector<Section> m_sections;

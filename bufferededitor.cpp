@@ -36,19 +36,9 @@ bool BufferedEditor::seek(qint64 position)
 
 	m_position = position;
 
-	m_sectionLocalPosition = 0;
 	const Section &s = m_sections[m_sectionIndex];
-	int pos = int(position - s.currentPosition);
-	for (int i = 0; ; ++m_sectionLocalPosition) {
-		if (s.data[m_sectionLocalPosition].current) {
-			if (i == pos)
-				break;
-			else
-				++i;
-		}
-	}
+	m_sectionLocalPosition = s.bytePosition(position);
 
-	m_sectionLocalPosition = int(position - m_sections[m_sectionIndex].currentPosition);
 	return true;
 }
 
@@ -93,6 +83,7 @@ void BufferedEditor::moveForward()
 BufferedEditor::Byte BufferedEditor::getByte()
 {
 	auto byte = m_sections[m_sectionIndex].data[m_sectionLocalPosition];
+	Q_ASSERT(byte.current);
 	moveForward();
 	return byte;
 }
@@ -139,13 +130,34 @@ void BufferedEditor::insertByte(char byte)
 		emit canRedoChanged(false);
 }
 
+void BufferedEditor::deleteByte()
+{
+	bool couldRedo = canRedo();
+	if (couldRedo) {
+		m_modifications.remove(m_currentModificationIndex, m_modifications.size() - m_currentModificationIndex);
+		Q_ASSERT(!canRedo());
+	}
+
+	Section &section = m_sections[m_sectionIndex];
+	Modification m = Deletion(*section.data[m_sectionLocalPosition].current, m_position);
+	doModification(m);
+	m_modifications.append(m);
+	m_currentModificationIndex = m_modifications.size();
+
+	Q_ASSERT(canUndo());
+	emit canUndoChanged(true);
+
+	if (couldRedo)
+		emit canRedoChanged(false);
+}
+
 bool BufferedEditor::writeChanges()
 {
 	// Needed for the dummy section
 	qint64 oldFileSize = m_device->size();
 
 	// Increase the file size if needed
-	if (m_device->size() < m_size)
+	if (m_device->size() != m_size)
 		if (!m_device->resize(m_size))
 			return false;
 
@@ -439,6 +451,20 @@ void BufferedEditor::doModification(Modification modification)
 		} else {
 			// TODO: partial implementation
 		}
+	} else if (std::holds_alternative<Deletion>(modification)) {
+		Deletion deletion = std::get<Deletion>(modification);
+		int sectionIndex = getSectionIndex(deletion.position);
+		Q_ASSERT(sectionIndex != -1);
+		Section &section = m_sections[sectionIndex];
+		int i = section.bytePosition(deletion.position);
+		Q_ASSERT(i != -1);
+		section.data[i].current.reset();
+		for (int i = sectionIndex + 1; i < m_sections.size(); ++i) {
+			--m_sections[i].currentPosition;
+			++m_sections[i].modificationCount;
+		}
+		++section.modificationCount;
+		--m_size;
 	}
 
 	++m_modificationCount;
@@ -470,6 +496,8 @@ void BufferedEditor::undoModification(Modification modification)
 		} else {
 			// TODO: partial implementation
 		}
+	} else if (std::holds_alternative<Deletion>(modification)) {
+		// TODO
 	}
 
 	--m_modificationCount;

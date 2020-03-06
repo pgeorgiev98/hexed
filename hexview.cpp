@@ -669,6 +669,20 @@ void HexView::keyPressEvent(QKeyEvent *event)
 		}
 	}
 
+	if (key == Qt::Key_Delete || key == Qt::Key_Backspace) {
+		int count = m_selectionEnd - m_selectionStart + 1;
+		if (m_selectionEnd == m_editor->size())
+			--count;
+		for (int i = 0; i < count; ++i) {
+			m_editor->seek(m_selectionStart);
+			m_editor->deleteByte();
+		}
+		m_selectionStart = m_selectionEnd = -1;
+		m_selection = Selection::None;
+		repaint();
+		return;
+	}
+
 	QWidget::keyPressEvent(event);
 }
 
