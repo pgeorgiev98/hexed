@@ -157,7 +157,7 @@ bool BufferedEditor::writeChanges()
 	qint64 oldFileSize = m_device->size();
 
 	// Increase the file size if needed
-	if (m_device->size() != m_size)
+	if (m_device->size() < m_size)
 		if (!m_device->resize(m_size))
 			return false;
 
@@ -178,17 +178,15 @@ bool BufferedEditor::writeChanges()
 	QVector<UnchangedSection> unchangedSections;
 
 	// Make a list of the UnchangedSections
-	qint64 savedPosition = 0, currentPosition = 0;
 	Section dummySection(oldFileSize, m_size); // Dummy end section
+	Section &firstSection = m_sections.isEmpty() ? dummySection : m_sections.first();
+	qint64 savedPosition = firstSection.savedPosition, currentPosition = firstSection.currentPosition;
 	for (int i = 0; i <= m_sections.size(); ++i) {
 		const Section &section = i < m_sections.size() ? m_sections[i] : dummySection;
 		Q_ASSERT(savedPosition <= section.savedPosition);
 
-		if (savedPosition == section.savedPosition) {
-			savedPosition += section.savedLength();
-			currentPosition += section.currentLength();
-		} else {
-			// The length shouldn't be changed
+		if (savedPosition != section.savedPosition) {
+			// The length of the unchanged section shouldn't be changed
 			Q_ASSERT(section.savedPosition - savedPosition == section.currentPosition - currentPosition);
 
 			qint64 length = section.savedPosition - savedPosition;
@@ -207,11 +205,13 @@ bool BufferedEditor::writeChanges()
 			savedPosition += length;
 			currentPosition += length;
 		}
+		savedPosition += section.savedLength();
+		currentPosition += section.currentLength();
 	}
 
 	// Sort them is such manner that the first sections in the list
 	// should be written first to the disk
-	std::sort(unchangedSections.begin(), unchangedSections.end(),
+	std::stable_sort(unchangedSections.begin(), unchangedSections.end(),
 		  // 'Less than' function, sorting is ascending
 		  [](const UnchangedSection &s1, const UnchangedSection &s2) -> bool {
 		// Return true when s1.old and s2.new are intersecting
@@ -220,7 +220,7 @@ bool BufferedEditor::writeChanges()
 				s2.newPosition + s2.length > s1.oldPosition;
 	});
 
-	qDebug() << unchangedSections.size() << "unchanged section have to be moved";
+	qDebug() << unchangedSections.size() << "unchanged sections have to be moved";
 	// Move those sections
 	for (int i = 0; i < unchangedSections.size(); ++i) {
 		UnchangedSection s = unchangedSections[i];
@@ -281,6 +281,10 @@ bool BufferedEditor::writeChanges()
 				b.saved = b.current;
 		}
 	}
+
+	if (m_device->size() > m_size)
+		if (!m_device->resize(m_size))
+			return false;
 
 	m_device->flush();
 
@@ -414,8 +418,6 @@ int BufferedEditor::getSectionIndex(qint64 position)
 			char b = buffer[i];
 			section.data[i] = Byte(b, b);
 		}
-
-		qDebug() << "Loaded from" << section.currentPosition << newSectionLength << "bytes";
 
 		// Add the new section to the list of loaded sections
 		index = nextIndex == -1 ? m_sections.size() : nextIndex;
