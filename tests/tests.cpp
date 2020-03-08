@@ -14,10 +14,12 @@ class TestObject : public QObject
 private slots:
 	void testReading();
 	void testDeleting();
+	void testReadingAndDeleting();
 
 private:
 	void testReadingHelper(const QByteArray &data, const QVector<int> &indicesToRead);
 	void testDeletingHelper(const QByteArray &data, const QVector<int> &indicesToDelete);
+	void testReadingAndDeletingHelper(const QByteArray &data, const QVector<QPair<int, int>> &indicesToDeleteAndRead);
 
 	template <typename R, typename C>
 	C createContainer(int size, std::function<R(int)> func)
@@ -102,6 +104,24 @@ void TestObject::testDeleting() {
 					createVector<int>(10'000, [](int i) { return 500'000 + (i * 23 + 13) % (10'000); }));
 }
 
+void TestObject::testReadingAndDeleting()
+{
+	// Basic delete test
+	testReadingAndDeletingHelper("abcdefghi", {{0, 7}, {3, 5}, {5, 0}});
+
+	// Test with a lot of 'random' deletions/reads
+	testReadingAndDeletingHelper(createByteArray(1'000'000, [](int i) { return i * 7 + 5; }),
+								 createVector<QPair<int, int>>(10'000, [](int i) {
+									return QPair<int, int>((i * 13 + 1) % (1'000'000 - i),
+														   (i * 23 + 5) % (1'000'000 - i)); }));
+
+	// Delete from the begining and read from the end
+	testReadingAndDeletingHelper(createByteArray(1'000'000, [](int i) { return i * 7 + 5; }),
+								 createVector<QPair<int, int>>(10'000, [](int i) {
+									return QPair<int, int>((i * 17 + 3) % 100'000,
+														   900'000 + (i * 13 + 7) % (100'000 - i)); }));
+}
+
 void TestObject::testReadingHelper(const QByteArray &data, const QVector<int> &indicesToRead)
 {
 	QTemporaryFile file;
@@ -132,6 +152,31 @@ void TestObject::testDeletingHelper(const QByteArray &data, const QVector<int> &
 		for (int index : indicesToDelete) {
 			e.seek(index);
 			e.deleteByte();
+		}
+		QVERIFY(e.writeChanges());
+	}
+	QVERIFY(file.seek(0));
+	QByteArray actualData = file.readAll();
+	QCOMPARE(actualData, expectedData);
+}
+
+void TestObject::testReadingAndDeletingHelper(const QByteArray &data, const QVector<QPair<int, int>> &indicesToDeleteAndRead)
+{
+	QByteArray expectedData = data;
+
+	QTemporaryFile file;
+	QVERIFY(file.open());
+	file.write(data);
+	{
+		BufferedEditor e(&file);
+		for (auto index : indicesToDeleteAndRead) {
+			e.seek(index.first);
+			e.deleteByte();
+			expectedData.remove(index.first, 1);
+			e.seek(index.second);
+			auto b = e.getByte();
+			Q_ASSERT(b.current);
+			Q_ASSERT(*b.current == expectedData[index.second]);
 		}
 		QVERIFY(e.writeChanges());
 	}
