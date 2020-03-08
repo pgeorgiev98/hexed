@@ -40,13 +40,33 @@ private:
 };
 
 void TestObject::testDeletion() {
+	// Basic delete test
 	testDeleteBytes("abcdef", {1, 3});
 
-	testDeleteBytes(createByteArray(10000, [](int i) { return i; }),
-					createVector<int>(100, [](int i) { return (i * 11 + 71) % (10000 - i); }));
+	// Test with a bigger file and 'random' deletions
+	testDeleteBytes(createByteArray(10'000, [](int i) { return i; }),
+					createVector<int>(100, [](int i) { return (i * 11 + 71) % (10'000 - i); }));
 
-	testDeleteBytes(createByteArray(1000000, [](int i) { return i * 7 + 5; }),
-					createVector<int>(10000, [](int i) { return (i * 13 + 1) % (1000000 - i); }));
+	// Test with a very large file and 'random' deletions
+	testDeleteBytes(createByteArray(1'000'000, [](int i) { return i * 7 + 5; }),
+					createVector<int>(10'000, [](int i) { return (i * 13 + 1) % (1'000'000 - i); }));
+
+	// Delete the first half of a file
+	testDeleteBytes(createByteArray(100'000, [](int i) { return i * 11 + 5; }),
+					QVector<int>(50'000, 0));
+
+	// Delete the second half of a file
+	testDeleteBytes(createByteArray(100'000, [](int i) { return i * 11 + 5; }),
+					createVector<int>(50'000, [](int i) { return 100'000 - 1 - i; }));
+
+	// Delete 'random' bytes near the begining and near the end of the file
+	testDeleteBytes(createByteArray(1'000'000, [](int i) { return i * 9 + 3; }),
+					createVector<int>(10'000, [](int i) { return (i * 13 + 1) % (10'000); }) +
+					createVector<int>(10'000, [](int i) { return 960'000 + (i * 13 + 1) % (10'000); }));
+
+	// Delete 'random' bytes in the middle of the file
+	testDeleteBytes(createByteArray(1'000'000, [](int i) { return i * 17 + 3; }),
+					createVector<int>(10'000, [](int i) { return 500'000 + (i * 23 + 13) % (10'000); }));
 }
 
 void TestObject::testDeleteBytes(const QByteArray &data, const QVector<int> &indicesToDelete)
