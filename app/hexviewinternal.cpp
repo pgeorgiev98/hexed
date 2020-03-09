@@ -1,5 +1,6 @@
 #include "hexviewinternal.h"
 #include "gotodialog.h"
+#include "findwidget.h"
 
 #include <QPainter>
 #include <QPaintEvent>
@@ -57,6 +58,7 @@ HexViewInternal::HexViewInternal(QWidget *parent)
 	, m_editingCell(false)
 	, m_editingCellByte(0x00)
 	, m_gotoDialog(new GotoDialog(this))
+	, m_findWidget(new FindWidget(this))
 {
 	QPalette pal = palette();
 	backgroundColor = pal.base().color();
@@ -74,6 +76,9 @@ HexViewInternal::HexViewInternal(QWidget *parent)
 	setMouseTracking(true);
 	setFocusPolicy(Qt::WheelFocus);
 
+	m_findWidget->hide();
+
+	connect(m_findWidget, &FindWidget::closed, [this]() { update(); });
 }
 
 QString HexViewInternal::toPlainText()
@@ -133,6 +138,16 @@ bool HexViewInternal::canUndo() const
 bool HexViewInternal::canRedo() const
 {
 	return m_editor->canRedo();
+}
+
+bool HexViewInternal::cursorIsInFindWidget(QPoint cursorPos) const
+{
+	if (m_findWidget->isVisible()) {
+		QPoint p = m_findWidget->mapFromParent(cursorPos);
+		if (m_findWidget->rect().contains(p))
+			return true;
+	}
+	return false;
 }
 
 void HexViewInternal::setBytesPerLine(int bytesPerLine)
@@ -273,6 +288,18 @@ void HexViewInternal::openGotoDialog()
 	repaint();
 }
 
+void HexViewInternal::openFindDialog()
+{
+	m_findWidget->show();
+	updateFindDialogPosition();
+	m_findWidget->setFocus();
+}
+
+void HexViewInternal::updateFindDialogPosition()
+{
+	m_findWidget->move(0, height() - m_findWidget->height());
+}
+
 void HexViewInternal::paintEvent(QPaintEvent *event)
 {
 	QPainter painter(this);
@@ -395,6 +422,7 @@ void HexViewInternal::paintEvent(QPaintEvent *event)
 void HexViewInternal::resizeEvent(QResizeEvent *)
 {
 	emit scrollMaximumChanged();
+	updateFindDialogPosition();
 }
 
 void HexViewInternal::mouseMoveEvent(QMouseEvent *event)
@@ -697,6 +725,9 @@ void HexViewInternal::keyPressEvent(QKeyEvent *event)
 
 qint64 HexViewInternal::getHoverCell(const QPoint &mousePos) const
 {
+	if (cursorIsInFindWidget(mousePos))
+		return -1;
+
 	qint64 x = mousePos.x();
 	qint64 y = mousePos.y();
 

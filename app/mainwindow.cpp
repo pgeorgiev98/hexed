@@ -1,5 +1,4 @@
 #include "mainwindow.h"
-#include "findwidget.h"
 #include "hexview.h"
 
 #include <QMessageBox>
@@ -21,6 +20,7 @@ MainWindow::MainWindow(QWidget *parent)
 	, m_undoAction(new QAction("&Undo"))
 	, m_redoAction(new QAction("&Redo"))
 	, m_gotoAction(new QAction("&Go to"))
+	, m_findAction(new QAction("&Find"))
 {
 	setCentralWidget(m_tabWidget);
 	resize(640, 480);
@@ -34,6 +34,7 @@ MainWindow::MainWindow(QWidget *parent)
 	m_undoAction->setShortcut(QKeySequence::Undo);
 	m_redoAction->setShortcut(QKeySequence::Redo);
 	m_gotoAction->setShortcut(QKeySequence(Qt::CTRL + Qt::Key_G));
+	m_findAction->setShortcut(QKeySequence::Find);
 
 	m_fileMenu->addAction(m_openAction);
 	m_fileMenu->addAction(m_saveAction);
@@ -43,6 +44,7 @@ MainWindow::MainWindow(QWidget *parent)
 	m_editMenu->addAction(m_redoAction);
 	m_editMenu->addSeparator();
 	m_editMenu->addAction(m_gotoAction);
+	m_editMenu->addAction(m_findAction);
 
 	menuBar()->addMenu(m_fileMenu);
 	menuBar()->addMenu(m_editMenu);
@@ -53,6 +55,7 @@ MainWindow::MainWindow(QWidget *parent)
 	connect(m_undoAction, &QAction::triggered, this, &MainWindow::undo);
 	connect(m_redoAction, &QAction::triggered, this, &MainWindow::redo);
 	connect(m_gotoAction, &QAction::triggered, this, &MainWindow::openGotoDialog);
+	connect(m_findAction, &QAction::triggered, this, &MainWindow::openFindDialog);
 
 	onTabCountChanged();
 }
@@ -131,6 +134,13 @@ void MainWindow::openGotoDialog()
 	HexView *tab = qobject_cast<HexView *>(m_tabWidget->currentWidget());
 	Q_ASSERT(tab);
 	tab->openGotoDialog();
+}
+
+void MainWindow::openFindDialog()
+{
+	HexView *tab = qobject_cast<HexView *>(m_tabWidget->currentWidget());
+	Q_ASSERT(tab);
+	tab->openFindDialog();
 }
 
 

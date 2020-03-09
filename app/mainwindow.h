@@ -23,6 +23,7 @@ public slots:
 	void undo();
 	void redo();
 	void openGotoDialog();
+	void openFindDialog();
 
 private slots:
 	void onTabCountChanged();
@@ -42,6 +43,7 @@ private:
 	QAction *m_undoAction;
 	QAction *m_redoAction;
 	QAction *m_gotoAction;
+	QAction *m_findAction;
 };
 
 #endif // MAINWINDOW_H

@@ -95,3 +95,8 @@ void HexView::openGotoDialog()
 {
 	m_hexViewInternal->openGotoDialog();
 }
+
+void HexView::openFindDialog()
+{
+	m_hexViewInternal->openFindDialog();
+}

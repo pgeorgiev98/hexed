@@ -2,5 +2,11 @@
 <RCC version="1.0">
 <qresource>
 <file alias="icon.ico">res/icon.ico</file>
+<file alias="light/up_arrow.svg">res/light/up_arrow.svg</file>
+<file alias="light/down_arrow.svg">res/light/down_arrow.svg</file>
+<file alias="light/x.svg">res/light/x.svg</file>
+<file alias="dark/up_arrow.svg">res/dark/up_arrow.svg</file>
+<file alias="dark/down_arrow.svg">res/dark/down_arrow.svg</file>
+<file alias="dark/x.svg">res/dark/x.svg</file>
 </qresource>
 </RCC>

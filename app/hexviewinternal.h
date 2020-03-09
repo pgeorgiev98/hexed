@@ -14,6 +14,7 @@
 #include <optional>
 
 class GotoDialog;
+class FindWidget;
 
 class QScrollBar;
 
@@ -39,6 +40,7 @@ private:
 	qint64 scrollMaximum() const;
 	bool canUndo() const;
 	bool canRedo() const;
+	bool cursorIsInFindWidget(QPoint cursorPos) const;
 
 signals:
 	void canUndoChanged(bool canUndo);
@@ -59,6 +61,8 @@ private slots:
 	void undo();
 	void redo();
 	void openGotoDialog();
+	void openFindDialog();
+	void updateFindDialogPosition();
 
 protected:
 	void paintEvent(QPaintEvent *) override;
@@ -96,6 +100,7 @@ private:
 	char m_editingCellByte;
 
 	GotoDialog *m_gotoDialog;
+	FindWidget *m_findWidget;
 
 	qint64 getHoverCell(const QPoint &mousePos) const;
 	qint64 getHoverText(const QPoint &mousePos) const;

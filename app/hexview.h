@@ -22,6 +22,7 @@ public slots:
 	void undo();
 	void redo();
 	void openGotoDialog();
+	void openFindDialog();
 
 signals:
 	void canUndoChanged(bool canUndo);
