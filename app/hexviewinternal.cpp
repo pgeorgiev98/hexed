@@ -1,4 +1,4 @@
-#include "hexview.h"
+#include "hexviewinternal.h"
 #include "gotodialog.h"
 
 #include <QPainter>
@@ -34,7 +34,7 @@ static QColor selectedTextColor("#000000");
 static const char hexTable[16] = {'0', '1', '2', '3', '4', '5', '6', '7',
 								  '8', '9', 'A', 'B', 'C', 'D', 'E', 'F'};
 
-HexView::HexView(QWidget *parent)
+HexViewInternal::HexViewInternal(QWidget *parent)
 	: QWidget(parent)
 	, m_font(QFontDatabase::systemFont(QFontDatabase::SystemFont::FixedFont))
 	, m_fontMetrics(m_font)
@@ -60,7 +60,7 @@ HexView::HexView(QWidget *parent)
 	, m_gotoDialog(new GotoDialog(this))
 {
 	m_verticalScrollBar->resize(QApplication::style()->pixelMetric(QStyle::PM_ScrollBarExtent), height());
-	connect(m_verticalScrollBar, &QAbstractSlider::valueChanged, this, &HexView::setVerticalScrollPosition);
+	connect(m_verticalScrollBar, &QAbstractSlider::valueChanged, this, &HexViewInternal::setVerticalScrollPosition);
 
 	QPalette pal = palette();
 	backgroundColor = pal.base().color();
@@ -80,7 +80,7 @@ HexView::HexView(QWidget *parent)
 
 }
 
-QString HexView::toPlainText()
+QString HexViewInternal::toPlainText()
 {
 	QString s;
 	if (m_editor->isEmpty())
@@ -100,7 +100,7 @@ QString HexView::toPlainText()
 	return s;
 }
 
-QPoint HexView::getByteCoordinates(int index) const
+QPoint HexViewInternal::getByteCoordinates(int index) const
 {
 	QPoint p;
 	p.setX(cellX(index % 16));
@@ -108,7 +108,7 @@ QPoint HexView::getByteCoordinates(int index) const
 	return p;
 }
 
-std::optional<HexView::ByteSelection> HexView::selection() const
+std::optional<HexViewInternal::ByteSelection> HexViewInternal::selection() const
 {
 	if (m_selection == Selection::None)
 		return std::optional<ByteSelection>();
@@ -118,22 +118,22 @@ std::optional<HexView::ByteSelection> HexView::selection() const
 	return ByteSelection(s, e - s + 1);
 }
 
-qint64 HexView::rowCount() const
+qint64 HexViewInternal::rowCount() const
 {
 	return (m_editor->size() + 1) / m_bytesPerLine + ((m_editor->size() + 1) % m_bytesPerLine > 0);
 }
 
-bool HexView::canUndo() const
+bool HexViewInternal::canUndo() const
 {
 	return m_editor->canUndo();
 }
 
-bool HexView::canRedo() const
+bool HexViewInternal::canRedo() const
 {
 	return m_editor->canRedo();
 }
 
-void HexView::setBytesPerLine(int bytesPerLine)
+void HexViewInternal::setBytesPerLine(int bytesPerLine)
 {
 	/*
 	m_bytesPerLine = bytesPerLine;
@@ -147,7 +147,7 @@ void HexView::setBytesPerLine(int bytesPerLine)
 	*/
 }
 
-void HexView::highlight(ByteSelection selection)
+void HexViewInternal::highlight(ByteSelection selection)
 {
 	m_selection = Selection::Cells;
 	m_selectionStart = selection.begin;
@@ -156,7 +156,7 @@ void HexView::highlight(ByteSelection selection)
 	repaint();
 }
 
-void HexView::selectNone()
+void HexViewInternal::selectNone()
 {
 	m_selectionStart = 0;
 	m_selectionEnd = 0;
@@ -166,7 +166,7 @@ void HexView::selectNone()
 	repaint();
 }
 
-void HexView::setFont(QFont font)
+void HexViewInternal::setFont(QFont font)
 {
 	m_font = font;
 	m_fontMetrics = QFontMetrics(m_font);
@@ -178,7 +178,7 @@ void HexView::setFont(QFont font)
 	repaint();
 }
 
-void HexView::setVerticalScrollPosition(int topRow)
+void HexViewInternal::setVerticalScrollPosition(int topRow)
 {
 	topRow = qBound(0, topRow, int(rowCount())); // TODO: qint64
 	m_verticalScrollBar->setValue(topRow);
@@ -187,7 +187,7 @@ void HexView::setVerticalScrollPosition(int topRow)
 	repaint();
 }
 
-bool HexView::openFile(const QString &path)
+bool HexViewInternal::openFile(const QString &path)
 {
 	m_file.setFileName(path);
 	if (!m_file.open(QIODevice::ReadWrite)) {
@@ -205,14 +205,14 @@ bool HexView::openFile(const QString &path)
 	selectNone();
 	repaint();
 
-	connect(m_editor, &BufferedEditor::canUndoChanged, this, &HexView::canUndoChanged);
-	connect(m_editor, &BufferedEditor::canRedoChanged, this, &HexView::canRedoChanged);
+	connect(m_editor, &BufferedEditor::canUndoChanged, this, &HexViewInternal::canUndoChanged);
+	connect(m_editor, &BufferedEditor::canRedoChanged, this, &HexViewInternal::canRedoChanged);
 
 	return true;
 }
 
 
-bool HexView::saveChanges()
+bool HexViewInternal::saveChanges()
 {
 	bool ok = m_editor->writeChanges();
 	if (!ok)
@@ -222,7 +222,7 @@ bool HexView::saveChanges()
 	return ok;
 }
 
-bool HexView::quit()
+bool HexViewInternal::quit()
 {
 	if (!m_editor->isModified())
 		return true;
@@ -240,19 +240,19 @@ bool HexView::quit()
 	return true;
 }
 
-void HexView::undo()
+void HexViewInternal::undo()
 {
 	m_editor->undo();
 	repaint();
 }
 
-void HexView::redo()
+void HexViewInternal::redo()
 {
 	m_editor->redo();
 	repaint();
 }
 
-void HexView::openGotoDialog()
+void HexViewInternal::openGotoDialog()
 {
 	m_gotoDialog->setMaximum(m_editor->size());
 	if (!m_gotoDialog->exec())
@@ -270,7 +270,7 @@ void HexView::openGotoDialog()
 	repaint();
 }
 
-void HexView::paintEvent(QPaintEvent *event)
+void HexViewInternal::paintEvent(QPaintEvent *event)
 {
 	QPainter painter(this);
 
@@ -389,7 +389,7 @@ void HexView::paintEvent(QPaintEvent *event)
 	}
 }
 
-void HexView::resizeEvent(QResizeEvent *)
+void HexViewInternal::resizeEvent(QResizeEvent *)
 {
 	// TODO
 
@@ -397,7 +397,7 @@ void HexView::resizeEvent(QResizeEvent *)
 	m_verticalScrollBar->resize(m_verticalScrollBar->width(), height());
 }
 
-void HexView::mouseMoveEvent(QMouseEvent *event)
+void HexViewInternal::mouseMoveEvent(QMouseEvent *event)
 {
 	int hoverCellIndex = getHoverCell(event->pos());
 	int hoverTextIndex = getHoverText(event->pos());
@@ -428,7 +428,7 @@ void HexView::mouseMoveEvent(QMouseEvent *event)
 	}
 }
 
-void HexView::mousePressEvent(QMouseEvent *event)
+void HexViewInternal::mousePressEvent(QMouseEvent *event)
 {
 	m_editingCell = false;
 
@@ -520,12 +520,12 @@ void HexView::mousePressEvent(QMouseEvent *event)
 	repaint();
 }
 
-void HexView::mouseReleaseEvent(QMouseEvent *)
+void HexViewInternal::mouseReleaseEvent(QMouseEvent *)
 {
 	m_selecting = false;
 }
 
-void HexView::mouseDoubleClickEvent(QMouseEvent *event)
+void HexViewInternal::mouseDoubleClickEvent(QMouseEvent *event)
 {
 	m_editingCell = false;
 
@@ -544,13 +544,13 @@ void HexView::mouseDoubleClickEvent(QMouseEvent *event)
 	}
 }
 
-void HexView::leaveEvent(QEvent *)
+void HexViewInternal::leaveEvent(QEvent *)
 {
 	m_hoveredIndex = -1;
 	repaint();
 }
 
-void HexView::wheelEvent(QWheelEvent *event)
+void HexViewInternal::wheelEvent(QWheelEvent *event)
 {
 	QPoint p = event->angleDelta();
 	if (p.y() != 0) {
@@ -565,7 +565,7 @@ void HexView::wheelEvent(QWheelEvent *event)
 	}
 }
 
-void HexView::keyPressEvent(QKeyEvent *event)
+void HexViewInternal::keyPressEvent(QKeyEvent *event)
 {
 	if (m_selecting || m_selectionStart == -1) {
 		QWidget::keyPressEvent(event);
@@ -686,7 +686,7 @@ void HexView::keyPressEvent(QKeyEvent *event)
 	QWidget::keyPressEvent(event);
 }
 
-int HexView::getHoverCell(const QPoint &mousePos) const
+int HexViewInternal::getHoverCell(const QPoint &mousePos) const
 {
 	int x = mousePos.x();
 	int y = mousePos.y();
@@ -722,7 +722,7 @@ int HexView::getHoverCell(const QPoint &mousePos) const
 	return -1;
 }
 
-int HexView::getHoverText(const QPoint &mousePos) const
+int HexViewInternal::getHoverText(const QPoint &mousePos) const
 {
 	int x = mousePos.x();
 	int y = mousePos.y();
@@ -743,7 +743,7 @@ int HexView::getHoverText(const QPoint &mousePos) const
 	return -1;
 }
 
-int HexView::lineNumberDigitsCount() const
+int HexViewInternal::lineNumberDigitsCount() const
 {
 	if (m_editor == nullptr)
 		return 0;
@@ -755,7 +755,7 @@ int HexView::lineNumberDigitsCount() const
 	return digits;
 }
 
-int HexView::lineNumberWidth() const
+int HexViewInternal::lineNumberWidth() const
 {
 	return m_cellSize + lineNumberDigitsCount() * m_characterWidth;
 }

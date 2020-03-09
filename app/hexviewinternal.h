@@ -1,5 +1,5 @@
-#ifndef HEXVIEW_H
-#define HEXVIEW_H
+#ifndef HEXVIEWINTERNAL_H
+#define HEXVIEWINTERNAL_H
 
 #include "bufferededitor.h"
 
@@ -17,11 +17,11 @@ class GotoDialog;
 
 class QScrollBar;
 
-class HexView : public QWidget
+class HexViewInternal : public QWidget
 {
 	Q_OBJECT
 public:
-	explicit HexView(QWidget *parent = nullptr);
+	explicit HexViewInternal(QWidget *parent = nullptr);
 
 	struct ByteSelection
 	{
@@ -98,4 +98,4 @@ private:
 	int lineNumberWidth() const;
 };
 
-#endif // HEXVIEW_H
+#endif // HEXVIEWINTERNAL_H

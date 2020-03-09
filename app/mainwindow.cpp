@@ -1,5 +1,6 @@
 #include "mainwindow.h"
-#include "hexview.h"
+#include "findwidget.h"
+#include "hexviewinternal.h"
 
 #include <QMessageBox>
 #include <QMenuBar>
@@ -58,12 +59,12 @@ MainWindow::MainWindow(QWidget *parent)
 
 bool MainWindow::openFile(const QString &path)
 {
-	HexView *tab = new HexView;
+	HexViewInternal *tab = new HexViewInternal;
 	bool ok = tab->openFile(path);
 	if (ok) {
 		m_tabWidget->insertTab(m_tabWidget->count(), tab, path);
-		connect(tab, &HexView::canUndoChanged, this, &MainWindow::onCanUndoChanged);
-		connect(tab, &HexView::canRedoChanged, this, &MainWindow::onCanRedoChanged);
+		connect(tab, &HexViewInternal::canUndoChanged, this, &MainWindow::onCanUndoChanged);
+		connect(tab, &HexViewInternal::canRedoChanged, this, &MainWindow::onCanRedoChanged);
 		m_tabWidget->setCurrentWidget(tab);
 		onTabCountChanged();
 	}
@@ -86,14 +87,14 @@ bool MainWindow::saveChanges()
 {
 	if (m_tabWidget->count() == 0)
 		return true;
-	HexView *tab = qobject_cast<HexView *>(m_tabWidget->currentWidget());
+	HexViewInternal *tab = qobject_cast<HexViewInternal *>(m_tabWidget->currentWidget());
 	Q_ASSERT(tab);
 	return tab->saveChanges();
 }
 
 bool MainWindow::closeTab(int index)
 {
-	HexView *tab = qobject_cast<HexView *>(m_tabWidget->widget(index));
+	HexViewInternal *tab = qobject_cast<HexViewInternal *>(m_tabWidget->widget(index));
 	Q_ASSERT(tab);
 	if (!tab->quit())
 		return false;
@@ -113,21 +114,21 @@ void MainWindow::onExitClicked()
 
 void MainWindow::undo()
 {
-	HexView *tab = qobject_cast<HexView *>(m_tabWidget->currentWidget());
+	HexViewInternal *tab = qobject_cast<HexViewInternal *>(m_tabWidget->currentWidget());
 	Q_ASSERT(tab);
 	tab->undo();
 }
 
 void MainWindow::redo()
 {
-	HexView *tab = qobject_cast<HexView *>(m_tabWidget->currentWidget());
+	HexViewInternal *tab = qobject_cast<HexViewInternal *>(m_tabWidget->currentWidget());
 	Q_ASSERT(tab);
 	tab->redo();
 }
 
 void MainWindow::openGotoDialog()
 {
-	HexView *tab = qobject_cast<HexView *>(m_tabWidget->currentWidget());
+	HexViewInternal *tab = qobject_cast<HexViewInternal *>(m_tabWidget->currentWidget());
 	Q_ASSERT(tab);
 	tab->openGotoDialog();
 }
@@ -148,7 +149,7 @@ void MainWindow::onCanUndoChanged()
 		m_undoAction->setEnabled(false);
 		return;
 	}
-	HexView *tab = qobject_cast<HexView *>(m_tabWidget->currentWidget());
+	HexViewInternal *tab = qobject_cast<HexViewInternal *>(m_tabWidget->currentWidget());
 	Q_ASSERT(tab);
 	m_undoAction->setEnabled(tab->canUndo());
 }
@@ -159,7 +160,7 @@ void MainWindow::onCanRedoChanged()
 		m_redoAction->setEnabled(false);
 		return;
 	}
-	HexView *tab = qobject_cast<HexView *>(m_tabWidget->currentWidget());
+	HexViewInternal *tab = qobject_cast<HexViewInternal *>(m_tabWidget->currentWidget());
 	Q_ASSERT(tab);
 	m_redoAction->setEnabled(tab->canRedo());
 }

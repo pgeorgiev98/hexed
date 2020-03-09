@@ -19,16 +19,18 @@ CONFIG += c++17
 SOURCES += \
         bufferededitor.cpp \
         expressionvalidator.cpp \
+        findwidget.cpp \
         gotodialog.cpp \
-        hexview.cpp \
+        hexviewinternal.cpp \
         main.cpp \
         mainwindow.cpp
 
 HEADERS += \
         bufferededitor.h \
         expressionvalidator.h \
+        findwidget.h \
         gotodialog.h \
-        hexview.h \
+        hexviewinternal.h \
         mainwindow.h
 
 RESOURCES += resources.qrc
