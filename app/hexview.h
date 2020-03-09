@@ -29,8 +29,10 @@ signals:
 
 private slots:
 	void onRowCountChanged();
-	void onTopRowChanged(int topRow);
+	void onTopRowChanged(qint64 topRow);
 	void onScrollBarChanged(int value);
+
+	int scrollStep(qint64 rowCount) const;
 
 private:
 	HexViewInternal *m_hexViewInternal;

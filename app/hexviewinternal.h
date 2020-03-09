@@ -27,22 +27,23 @@ private:
 
 	struct ByteSelection
 	{
-		int begin, count;
-		ByteSelection(int begin, int count)
+		qint64 begin, count;
+		ByteSelection(qint64 begin, qint64 count)
 			: begin(begin), count(count) {}
 	};
 
 	QString toPlainText();
-	QPoint getByteCoordinates(int index) const;
+	QPoint getByteCoordinates(qint64 index) const;
 	std::optional<ByteSelection> selection() const;
 	qint64 rowCount() const;
+	qint64 scrollMaximum() const;
 	bool canUndo() const;
 	bool canRedo() const;
 
 signals:
 	void canUndoChanged(bool canUndo);
 	void canRedoChanged(bool canRedo);
-	void topRowChanged(int topRow);
+	void topRowChanged(qint64 topRow);
 	void rowCountChanged();
 
 private slots:
@@ -50,7 +51,7 @@ private slots:
 	void highlight(ByteSelection selection);
 	void selectNone();
 	void setFont(QFont font);
-	void setTopRow(int topRow);
+	void setTopRow(qint64 topRow);
 	bool openFile(const QString &path);
 	bool saveChanges();
 	bool quit();
@@ -74,9 +75,9 @@ private:
 	int m_characterWidth;
 	int m_cellSize, m_cellPadding;
 	int m_bytesPerLine;
-	int m_hoveredIndex;
-	int m_selectionStart;
-	int m_selectionEnd;
+	qint64 m_hoveredIndex;
+	qint64 m_selectionStart;
+	qint64 m_selectionEnd;
 	enum class Selection {
 		None = 0,
 		Cells,
@@ -94,8 +95,8 @@ private:
 
 	GotoDialog *m_gotoDialog;
 
-	int getHoverCell(const QPoint &mousePos) const;
-	int getHoverText(const QPoint &mousePos) const;
+	qint64 getHoverCell(const QPoint &mousePos) const;
+	qint64 getHoverText(const QPoint &mousePos) const;
 	int lineNumberDigitsCount() const;
 	int lineNumberWidth() const;
 };

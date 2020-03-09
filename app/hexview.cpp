@@ -4,6 +4,8 @@
 #include <QHBoxLayout>
 #include <QScrollBar>
 
+// TODO: Optionally don't scroll in real time while the scrollbar is being dragged
+
 HexView::HexView(QWidget *parent)
 	: QWidget(parent)
 	, m_hexViewInternal(new HexViewInternal)
@@ -25,21 +27,31 @@ HexView::HexView(QWidget *parent)
 
 void HexView::onRowCountChanged()
 {
-	// TODO
-	qint64 rowCount = m_hexViewInternal->rowCount();
-	m_verticalScrollBar->setMaximum(int(rowCount) - 1);
+	qint64 scrollMaximum = m_hexViewInternal->scrollMaximum();
+	m_verticalScrollBar->setMaximum(scrollMaximum / scrollStep(scrollMaximum) + 1);
 }
 
-void HexView::onTopRowChanged(int topRow)
+void HexView::onTopRowChanged(qint64 topRow)
 {
-	// TODO
-	m_verticalScrollBar->setValue(topRow);
+	qint64 scrollMaximum = m_hexViewInternal->scrollMaximum();
+	m_verticalScrollBar->setValue(topRow / scrollStep(scrollMaximum));
 }
 
 void HexView::onScrollBarChanged(int value)
 {
-	// TODO
-	m_hexViewInternal->setTopRow(value);
+	qint64 scrollMaximum = m_hexViewInternal->scrollMaximum();
+	qint64 topRow = qint64(value) * scrollStep(scrollMaximum);
+	if (topRow > scrollMaximum)
+		topRow = scrollMaximum;
+	m_hexViewInternal->setTopRow(topRow);
+}
+
+int HexView::scrollStep(qint64 rowCount) const
+{
+	const qint64 maxScrollValue = 2100000000;
+	int step = rowCount / maxScrollValue;
+	step += (rowCount % maxScrollValue > 0);
+	return qMax(step, 1);
 }
 
 

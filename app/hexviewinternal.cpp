@@ -96,7 +96,7 @@ QString HexViewInternal::toPlainText()
 	return s;
 }
 
-QPoint HexViewInternal::getByteCoordinates(int index) const
+QPoint HexViewInternal::getByteCoordinates(qint64 index) const
 {
 	QPoint p;
 	p.setX(cellX(index % 16));
@@ -108,7 +108,7 @@ std::optional<HexViewInternal::ByteSelection> HexViewInternal::selection() const
 {
 	if (m_selection == Selection::None)
 		return std::optional<ByteSelection>();
-	int s = m_selectionStart, e = m_selectionEnd;
+	qint64 s = m_selectionStart, e = m_selectionEnd;
 	if (s > e)
 		qSwap(s, e);
 	return ByteSelection(s, e - s + 1);
@@ -117,6 +117,12 @@ std::optional<HexViewInternal::ByteSelection> HexViewInternal::selection() const
 qint64 HexViewInternal::rowCount() const
 {
 	return (m_editor->size() + 1) / m_bytesPerLine + ((m_editor->size() + 1) % m_bytesPerLine > 0);
+}
+
+qint64 HexViewInternal::scrollMaximum() const
+{
+	int displayedRows = height() / (m_cellSize + m_cellPadding);
+	return rowCount() - displayedRows + 5;
 }
 
 bool HexViewInternal::canUndo() const
@@ -174,9 +180,9 @@ void HexViewInternal::setFont(QFont font)
 	repaint();
 }
 
-void HexViewInternal::setTopRow(int topRow)
+void HexViewInternal::setTopRow(qint64 topRow)
 {
-	topRow = qBound(0, topRow, int(rowCount())); // TODO: qint64
+	topRow = qBound(qint64(0), topRow, rowCount());
 	m_topRow = topRow;
 	emit topRowChanged(topRow);
 
@@ -275,11 +281,11 @@ void HexViewInternal::paintEvent(QPaintEvent *event)
 
 	const int cellHeight = m_cellSize + m_cellPadding;
 
-	const int startY = qMax(0, (event->rect().y() + cellHeight * int(m_topRow)) / cellHeight); // TODO: qint64
-	const int endY = qMin(int(m_editor->size()), (event->rect().bottom() + cellHeight * int(m_topRow)) / cellHeight + 1); // TODO: qint64
+	const qint64 startY = qMax(qint64(0), (event->rect().y() + cellHeight * m_topRow) / cellHeight);
+	const qint64 endY = qMin(m_editor->size(), (event->rect().bottom() + cellHeight * m_topRow) / cellHeight + 1);
 
-	int selectionStart = -1;
-	int selectionEnd = -1;
+	qint64 selectionStart = -1;
+	qint64 selectionEnd = -1;
 	if (m_selection == Selection::Cells || m_selection == Selection::Text) {
 		selectionStart = qMin(m_selectionStart, m_selectionEnd);
 		selectionEnd = qMax(m_selectionStart, m_selectionEnd) + 1;
@@ -295,11 +301,11 @@ void HexViewInternal::paintEvent(QPaintEvent *event)
 
 	QString cellText = "FF";
 	QString ch = "a";
-	int i = startY * m_bytesPerLine;
+	qint64 i = startY * m_bytesPerLine;
 	if (i >= m_editor->size())
 		return;
 	m_editor->seek(i);
-	for (int y = startY, yCoord = m_cellSize; i <= m_editor->size() && y < endY; ++y, yCoord += cellHeight) {
+	for (qint64 y = startY, yCoord = m_cellSize; i <= m_editor->size() && y < endY; ++y, yCoord += cellHeight) {
 
 		bool rowIsHovered = m_hoveredIndex == -1 ? false : m_hoveredIndex / 16 == y;
 
@@ -311,7 +317,7 @@ void HexViewInternal::paintEvent(QPaintEvent *event)
 		painter.drawText(QPointF(m_cellSize / 2, yCoord),
 						 QString::number(m_editor->position(), 16).rightJustified(lineNumberDigitsCount(), '0'));
 
-		for (int x = 0; i <= m_editor->size() && x < m_bytesPerLine; ++x, ++i) {
+		for (qint64 x = 0; i <= m_editor->size() && x < m_bytesPerLine; ++x, ++i) {
 			QPoint cellCoord;
 			cellCoord.setX(cellX(x));
 			cellCoord.setY(yCoord);
@@ -388,10 +394,10 @@ void HexViewInternal::paintEvent(QPaintEvent *event)
 
 void HexViewInternal::mouseMoveEvent(QMouseEvent *event)
 {
-	int hoverCellIndex = getHoverCell(event->pos());
-	int hoverTextIndex = getHoverText(event->pos());
+	qint64 hoverCellIndex = getHoverCell(event->pos());
+	qint64 hoverTextIndex = getHoverText(event->pos());
 
-	int newIndex = qMax(hoverCellIndex, hoverTextIndex);
+	qint64 newIndex = qMax(hoverCellIndex, hoverTextIndex);
 	if (newIndex != m_hoveredIndex) {
 		m_hoveredIndex = newIndex;
 
@@ -422,8 +428,8 @@ void HexViewInternal::mousePressEvent(QMouseEvent *event)
 	m_editingCell = false;
 
 	if (event->button() == Qt::RightButton) {
-		int selectionStart = -1;
-		int selectionEnd = -1;
+		qint64 selectionStart = -1;
+		qint64 selectionEnd = -1;
 		if (m_selection == Selection::Cells || m_selection == Selection::Text) {
 			selectionStart = qMin(m_selectionStart, m_selectionEnd);
 			selectionEnd = qMax(m_selectionStart, m_selectionEnd) + 1;
@@ -494,9 +500,9 @@ void HexViewInternal::mousePressEvent(QMouseEvent *event)
 		}
 		return;
 	}
-	int hoverCellIndex = getHoverCell(event->pos());
-	int hoverTextIndex = getHoverText(event->pos());
-	int newIndex = qMax(hoverCellIndex, hoverTextIndex);
+	qint64 hoverCellIndex = getHoverCell(event->pos());
+	qint64 hoverTextIndex = getHoverText(event->pos());
+	qint64 newIndex = qMax(hoverCellIndex, hoverTextIndex);
 	m_selectionStart = newIndex;
 	m_selectionEnd = m_selectionStart;
 	if (newIndex == -1)
@@ -518,9 +524,9 @@ void HexViewInternal::mouseDoubleClickEvent(QMouseEvent *event)
 {
 	m_editingCell = false;
 
-	int hoverCellIndex = getHoverCell(event->pos());
-	int hoverTextIndex = getHoverText(event->pos());
-	int newIndex = qMax(hoverCellIndex, hoverTextIndex);
+	qint64 hoverCellIndex = getHoverCell(event->pos());
+	qint64 hoverTextIndex = getHoverText(event->pos());
+	qint64 newIndex = qMax(hoverCellIndex, hoverTextIndex);
 	if (newIndex != -1) {
 		m_selectionStart = m_bytesPerLine * (newIndex / m_bytesPerLine);
 		m_selectionEnd = m_selectionStart + m_bytesPerLine - 1;
@@ -549,7 +555,7 @@ void HexViewInternal::wheelEvent(QWheelEvent *event)
 			m_mouseScrollBuffer -= v;
 			qint64 newTopRow = m_topRow;
 			newTopRow -= v;
-			setTopRow(newTopRow);
+			setTopRow(qBound(qint64(0), newTopRow, scrollMaximum()));
 		}
 	}
 }
@@ -657,7 +663,7 @@ void HexViewInternal::keyPressEvent(QKeyEvent *event)
 			move = m_bytesPerLine; break;
 		}
 		if (m_selectionStart == m_selectionEnd) {
-			m_selectionStart = qBound(0, m_selectionStart + move, int(m_editor->size() - 1)); // TODO: qint64
+			m_selectionStart = qBound(qint64(0), m_selectionStart + move, m_editor->size() - 1);
 			m_selectionEnd = m_selectionStart;
 			repaint();
 			return;
@@ -665,10 +671,10 @@ void HexViewInternal::keyPressEvent(QKeyEvent *event)
 	}
 
 	if (key == Qt::Key_Delete || key == Qt::Key_Backspace) {
-		int count = m_selectionEnd - m_selectionStart + 1;
+		qint64 count = m_selectionEnd - m_selectionStart + 1;
 		if (m_selectionEnd == m_editor->size())
 			--count;
-		for (int i = 0; i < count; ++i) {
+		for (qint64 i = 0; i < count; ++i) {
 			qint64 prevRowCount = rowCount();
 			m_editor->seek(m_selectionStart);
 			m_editor->deleteByte();
@@ -684,15 +690,15 @@ void HexViewInternal::keyPressEvent(QKeyEvent *event)
 	QWidget::keyPressEvent(event);
 }
 
-int HexViewInternal::getHoverCell(const QPoint &mousePos) const
+qint64 HexViewInternal::getHoverCell(const QPoint &mousePos) const
 {
-	int x = mousePos.x();
-	int y = mousePos.y();
+	qint64 x = mousePos.x();
+	qint64 y = mousePos.y();
 
 	x -= lineNumberWidth();
 
 	{
-		int vx = x;
+		qint64 vx = x;
 		while (vx > 8 * m_cellPadding + 8 * m_cellSize) {
 			x -= m_cellPadding;
 			vx -= m_cellPadding;
@@ -705,8 +711,8 @@ int HexViewInternal::getHoverCell(const QPoint &mousePos) const
 
 	y += (m_cellPadding + m_cellSize) * m_topRow;
 
-	int xi = -1;
-	int yi = -1;
+	qint64 xi = -1;
+	qint64 yi = -1;
 
 	if (x >= 0 && x < m_bytesPerLine * (m_cellPadding + m_cellSize))
 		xi = x / (m_cellPadding + m_cellSize);
@@ -715,28 +721,28 @@ int HexViewInternal::getHoverCell(const QPoint &mousePos) const
 		yi = y / (m_cellPadding + m_cellSize);
 
 	if (xi != -1 && yi != -1)
-		return qMin(xi + m_bytesPerLine * yi, int(m_editor->size()));
+		return qMin(xi + m_bytesPerLine * yi, m_editor->size());
 
 	return -1;
 }
 
-int HexViewInternal::getHoverText(const QPoint &mousePos) const
+qint64 HexViewInternal::getHoverText(const QPoint &mousePos) const
 {
-	int x = mousePos.x();
-	int y = mousePos.y();
+	qint64 x = mousePos.x();
+	qint64 y = mousePos.y();
 
 	y += (m_cellPadding + m_cellSize) * m_topRow;
 
 	x -= cellX(m_bytesPerLine + 1);
 
-	int xi = -1, yi = -2;
+	qint64 xi = -1, yi = -2;
 	if (x >= 0 && x < (m_characterWidth + 5) * m_bytesPerLine)
 		xi = x / (m_characterWidth + 5);
 	if (y >= 0 && y <= m_editor->size() * (m_cellPadding + m_cellSize))
 		yi = y / (m_cellPadding + m_cellSize);
 
 	if (xi != -1 && yi != -1)
-		return qMin(xi + m_bytesPerLine * yi, int(m_editor->size()));
+		return qMin(xi + m_bytesPerLine * yi, m_editor->size());
 
 	return -1;
 }
