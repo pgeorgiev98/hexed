@@ -20,7 +20,9 @@ class QScrollBar;
 class HexViewInternal : public QWidget
 {
 	Q_OBJECT
-public:
+private:
+	friend class HexView;
+
 	explicit HexViewInternal(QWidget *parent = nullptr);
 
 	struct ByteSelection
@@ -40,13 +42,15 @@ public:
 signals:
 	void canUndoChanged(bool canUndo);
 	void canRedoChanged(bool canRedo);
+	void topRowChanged(int topRow);
+	void rowCountChanged();
 
-public slots:
+private slots:
 	void setBytesPerLine(int bytesPerLine);
 	void highlight(ByteSelection selection);
 	void selectNone();
 	void setFont(QFont font);
-	void setVerticalScrollPosition(int topRow);
+	void setTopRow(int topRow);
 	bool openFile(const QString &path);
 	bool saveChanges();
 	bool quit();
@@ -56,7 +60,6 @@ public slots:
 
 protected:
 	void paintEvent(QPaintEvent *) override;
-	void resizeEvent(QResizeEvent *event) override;
 	void mouseMoveEvent(QMouseEvent *) override;
 	void mousePressEvent(QMouseEvent *) override;
 	void mouseReleaseEvent(QMouseEvent *) override;
@@ -84,8 +87,7 @@ private:
 	bool m_selecting;
 	QFile m_file;
 	BufferedEditor *m_editor;
-	QScrollBar *m_verticalScrollBar;
-	qint64 m_scrollTopRow;
+	qint64 m_topRow;
 	double m_mouseScrollBuffer;
 	bool m_editingCell;
 	char m_editingCellByte;

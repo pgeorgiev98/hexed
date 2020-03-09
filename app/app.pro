@@ -21,6 +21,7 @@ SOURCES += \
         expressionvalidator.cpp \
         findwidget.cpp \
         gotodialog.cpp \
+        hexview.cpp \
         hexviewinternal.cpp \
         main.cpp \
         mainwindow.cpp
@@ -30,6 +31,7 @@ HEADERS += \
         expressionvalidator.h \
         findwidget.h \
         gotodialog.h \
+        hexview.h \
         hexviewinternal.h \
         mainwindow.h
 

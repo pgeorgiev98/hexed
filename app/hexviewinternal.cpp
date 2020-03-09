@@ -52,16 +52,12 @@ HexViewInternal::HexViewInternal(QWidget *parent)
 	, m_selection(Selection::None)
 	, m_selecting(false)
 	, m_editor(nullptr)
-	, m_verticalScrollBar(new QScrollBar(this))
-	, m_scrollTopRow(0)
+	, m_topRow(0)
 	, m_mouseScrollBuffer(0.0)
 	, m_editingCell(false)
 	, m_editingCellByte(0x00)
 	, m_gotoDialog(new GotoDialog(this))
 {
-	m_verticalScrollBar->resize(QApplication::style()->pixelMetric(QStyle::PM_ScrollBarExtent), height());
-	connect(m_verticalScrollBar, &QAbstractSlider::valueChanged, this, &HexViewInternal::setVerticalScrollPosition);
-
 	QPalette pal = palette();
 	backgroundColor = pal.base().color();
 	alternateBackgroundColor = pal.alternateBase().color();
@@ -73,7 +69,7 @@ HexViewInternal::HexViewInternal(QWidget *parent)
 	pal.setColor(QPalette::Window, backgroundColor);
 	setAutoFillBackground(true);
 	setPalette(pal);
-	setFixedWidth(textX(m_bytesPerLine) + m_cellPadding + m_verticalScrollBar->width());
+	setFixedWidth(textX(m_bytesPerLine) + m_cellPadding);
 	setMinimumHeight(80);
 	setMouseTracking(true);
 	setFocusPolicy(Qt::WheelFocus);
@@ -178,11 +174,11 @@ void HexViewInternal::setFont(QFont font)
 	repaint();
 }
 
-void HexViewInternal::setVerticalScrollPosition(int topRow)
+void HexViewInternal::setTopRow(int topRow)
 {
 	topRow = qBound(0, topRow, int(rowCount())); // TODO: qint64
-	m_verticalScrollBar->setValue(topRow);
-	m_scrollTopRow = topRow;
+	m_topRow = topRow;
+	emit topRowChanged(topRow);
 
 	repaint();
 }
@@ -199,14 +195,15 @@ bool HexViewInternal::openFile(const QString &path)
 
 	m_editor = new BufferedEditor(&m_file, this);
 
-	m_verticalScrollBar->setRange(0, int(rowCount() - 1)); // TODO: qint64
-	setVerticalScrollPosition(0);
-	setFixedWidth(textX(m_bytesPerLine) + m_cellPadding + m_verticalScrollBar->width());
+	setTopRow(0);
+	setFixedWidth(textX(m_bytesPerLine) + m_cellPadding);
 	selectNone();
 	repaint();
 
 	connect(m_editor, &BufferedEditor::canUndoChanged, this, &HexViewInternal::canUndoChanged);
 	connect(m_editor, &BufferedEditor::canRedoChanged, this, &HexViewInternal::canRedoChanged);
+
+	emit rowCountChanged();
 
 	return true;
 }
@@ -265,7 +262,7 @@ void HexViewInternal::openGotoDialog()
 	else
 		m_selection = Selection::Cells;
 	m_selectionStart = m_selectionEnd = position;
-	setVerticalScrollPosition(position / m_bytesPerLine);
+	setTopRow(position / m_bytesPerLine);
 
 	repaint();
 }
@@ -278,8 +275,8 @@ void HexViewInternal::paintEvent(QPaintEvent *event)
 
 	const int cellHeight = m_cellSize + m_cellPadding;
 
-	const int startY = qMax(0, (event->rect().y() + cellHeight * int(m_scrollTopRow)) / cellHeight); // TODO: qint64
-	const int endY = qMin(int(m_editor->size()), (event->rect().bottom() + cellHeight * int(m_scrollTopRow)) / cellHeight + 1); // TODO: qint64
+	const int startY = qMax(0, (event->rect().y() + cellHeight * int(m_topRow)) / cellHeight); // TODO: qint64
+	const int endY = qMin(int(m_editor->size()), (event->rect().bottom() + cellHeight * int(m_topRow)) / cellHeight + 1); // TODO: qint64
 
 	int selectionStart = -1;
 	int selectionEnd = -1;
@@ -384,17 +381,9 @@ void HexViewInternal::paintEvent(QPaintEvent *event)
 	{
 		painter.setPen(textColor);
 		int x = lineNumberWidth();
-		qint64 y = qMin((rowCount() - m_scrollTopRow) * cellHeight, qint64(height()));
+		qint64 y = qMin((rowCount() - m_topRow) * cellHeight, qint64(height()));
 		painter.drawLine(x, 0, x, int(y));
 	}
-}
-
-void HexViewInternal::resizeEvent(QResizeEvent *)
-{
-	// TODO
-
-	m_verticalScrollBar->move(width() - m_verticalScrollBar->width(), 0);
-	m_verticalScrollBar->resize(m_verticalScrollBar->width(), height());
 }
 
 void HexViewInternal::mouseMoveEvent(QMouseEvent *event)
@@ -558,9 +547,9 @@ void HexViewInternal::wheelEvent(QWheelEvent *event)
 		int v = qFloor(m_mouseScrollBuffer);
 		if (v != 0) {
 			m_mouseScrollBuffer -= v;
-			qint64 newTopRow = m_scrollTopRow;
+			qint64 newTopRow = m_topRow;
 			newTopRow -= v;
-			setVerticalScrollPosition(newTopRow);
+			setTopRow(newTopRow);
 		}
 	}
 }
@@ -581,7 +570,10 @@ void HexViewInternal::keyPressEvent(QKeyEvent *event)
 	auto putByte = [this]() {
 		m_editor->seek(m_selectionStart);
 		if (m_editor->atEnd()) {
+			qint64 prevRowCount = rowCount();
 			m_editor->insertByte(m_editingCellByte);
+			if (prevRowCount != rowCount())
+				emit rowCountChanged();
 		} else {
 			while (m_editor->position() <= m_selectionEnd) {
 				m_editor->replaceByte(m_editingCellByte);
@@ -628,7 +620,10 @@ void HexViewInternal::keyPressEvent(QKeyEvent *event)
 			if (byte >= 32 && byte < 127) {
 				m_editor->seek(m_selectionStart);
 				if (m_editor->atEnd()) {
+					qint64 prevRowCount = rowCount();
 					m_editor->insertByte(byte);
+					if (prevRowCount != rowCount())
+						emit rowCountChanged();
 				} else {
 					while (m_editor->position() <= m_selectionEnd) {
 						m_editor->replaceByte(byte);
@@ -674,8 +669,11 @@ void HexViewInternal::keyPressEvent(QKeyEvent *event)
 		if (m_selectionEnd == m_editor->size())
 			--count;
 		for (int i = 0; i < count; ++i) {
+			qint64 prevRowCount = rowCount();
 			m_editor->seek(m_selectionStart);
 			m_editor->deleteByte();
+			if (prevRowCount != rowCount())
+				emit rowCountChanged();
 		}
 		m_selectionStart = m_selectionEnd = -1;
 		m_selection = Selection::None;
@@ -705,7 +703,7 @@ int HexViewInternal::getHoverCell(const QPoint &mousePos) const
 	x -= m_cellPadding / 2;
 	y -= m_cellPadding / 2;
 
-	y += (m_cellPadding + m_cellSize) * m_scrollTopRow;
+	y += (m_cellPadding + m_cellSize) * m_topRow;
 
 	int xi = -1;
 	int yi = -1;
@@ -727,7 +725,7 @@ int HexViewInternal::getHoverText(const QPoint &mousePos) const
 	int x = mousePos.x();
 	int y = mousePos.y();
 
-	y += (m_cellPadding + m_cellSize) * m_scrollTopRow;
+	y += (m_cellPadding + m_cellSize) * m_topRow;
 
 	x -= cellX(m_bytesPerLine + 1);
 
