@@ -28,8 +28,8 @@ signals:
 	void canRedoChanged(bool canRedo);
 
 private slots:
-	void onRowCountChanged();
-	void onTopRowChanged(qint64 topRow);
+	void updateScrollMaximum();
+	void setTopRow(qint64 topRow);
 	void onScrollBarChanged(int value);
 
 	int scrollStep(qint64 rowCount) const;

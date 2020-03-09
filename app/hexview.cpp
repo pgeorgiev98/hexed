@@ -20,18 +20,19 @@ HexView::HexView(QWidget *parent)
 
 	connect(m_hexViewInternal, &HexViewInternal::canUndoChanged, this, &HexView::canUndoChanged);
 	connect(m_hexViewInternal, &HexViewInternal::canRedoChanged, this, &HexView::canRedoChanged);
-	connect(m_hexViewInternal, &HexViewInternal::rowCountChanged, this, &HexView::onRowCountChanged);
-	connect(m_hexViewInternal, &HexViewInternal::topRowChanged, this, &HexView::onTopRowChanged);
+	connect(m_hexViewInternal, &HexViewInternal::rowCountChanged, this, &HexView::updateScrollMaximum);
+	connect(m_hexViewInternal, &HexViewInternal::topRowChanged, this, &HexView::setTopRow);
+	connect(m_hexViewInternal, &HexViewInternal::scrollMaximumChanged, this, &HexView::updateScrollMaximum);
 	connect(m_verticalScrollBar, &QScrollBar::valueChanged, this, &HexView::onScrollBarChanged);
 }
 
-void HexView::onRowCountChanged()
+void HexView::updateScrollMaximum()
 {
 	qint64 scrollMaximum = m_hexViewInternal->scrollMaximum();
 	m_verticalScrollBar->setMaximum(scrollMaximum / scrollStep(scrollMaximum) + 1);
 }
 
-void HexView::onTopRowChanged(qint64 topRow)
+void HexView::setTopRow(qint64 topRow)
 {
 	qint64 scrollMaximum = m_hexViewInternal->scrollMaximum();
 	m_verticalScrollBar->setValue(topRow / scrollStep(scrollMaximum));

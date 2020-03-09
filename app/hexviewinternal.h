@@ -45,6 +45,7 @@ signals:
 	void canRedoChanged(bool canRedo);
 	void topRowChanged(qint64 topRow);
 	void rowCountChanged();
+	void scrollMaximumChanged();
 
 private slots:
 	void setBytesPerLine(int bytesPerLine);
@@ -61,6 +62,7 @@ private slots:
 
 protected:
 	void paintEvent(QPaintEvent *) override;
+	void resizeEvent(QResizeEvent *) override;
 	void mouseMoveEvent(QMouseEvent *) override;
 	void mousePressEvent(QMouseEvent *) override;
 	void mouseReleaseEvent(QMouseEvent *) override;

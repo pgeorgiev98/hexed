@@ -392,6 +392,11 @@ void HexViewInternal::paintEvent(QPaintEvent *event)
 	}
 }
 
+void HexViewInternal::resizeEvent(QResizeEvent *)
+{
+	emit scrollMaximumChanged();
+}
+
 void HexViewInternal::mouseMoveEvent(QMouseEvent *event)
 {
 	qint64 hoverCellIndex = getHoverCell(event->pos());
