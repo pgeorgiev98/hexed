@@ -1,6 +1,7 @@
 #include "mainwindow.h"
 #include <QApplication>
 #include <QTextStream>
+#include <QDateTime>
 
 static void printUsage(const QStringList &args, QTextStream &out)
 {
@@ -11,6 +12,7 @@ static QTextStream out(stdout);
 
 int main(int argc, char *argv[])
 {
+	qsrand(QDateTime::currentDateTime().toMSecsSinceEpoch());
 	QApplication a(argc, argv);
 
 	const auto &args = a.arguments();

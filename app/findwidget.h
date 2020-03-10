@@ -25,6 +25,7 @@ public slots:
 protected:
 	void keyPressEvent(QKeyEvent *) override;
 	void focusInEvent(QFocusEvent *) override;
+	void showEvent(QShowEvent *) override;
 
 private slots:
 	void searchDown();

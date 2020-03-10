@@ -30,7 +30,6 @@ FindWidget::FindWidget(HexViewInternal *hexView, QWidget *parent)
 	, m_message(new QLabel)
 {
 	setAutoFillBackground(true);
-	m_input->setPlaceholderText("0D FF E2 ...");
 	// TODO: Automatically place a space here
 	m_input->setValidator(new QRegExpValidator(QRegExp("([0-9a-fA-f]{2} )*([0-9a-fA-f]{2})")));
 
@@ -93,6 +92,15 @@ void FindWidget::focusInEvent(QFocusEvent *)
 {
 	m_input->setFocus();
 	m_input->selectAll();
+}
+
+void FindWidget::showEvent(QShowEvent *)
+{
+	QString placeholder;
+	for (int i = 0; i < 5; ++i)
+		placeholder.append(QString("%1 ").arg(qrand() % 256, 2, 16, QChar('0')));
+	placeholder.append("...");
+	m_input->setPlaceholderText(placeholder);
 }
 
 void FindWidget::searchDown()
