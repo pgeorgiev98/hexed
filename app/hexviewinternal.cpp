@@ -1,4 +1,5 @@
 #include "hexviewinternal.h"
+#include "bufferededitor.h"
 #include "gotodialog.h"
 #include "findwidget.h"
 
@@ -58,7 +59,7 @@ HexViewInternal::HexViewInternal(QWidget *parent)
 	, m_editingCell(false)
 	, m_editingCellByte(0x00)
 	, m_gotoDialog(new GotoDialog(this))
-	, m_findWidget(new FindWidget(this))
+	, m_findWidget(nullptr)
 {
 	QPalette pal = palette();
 	backgroundColor = pal.base().color();
@@ -75,10 +76,11 @@ HexViewInternal::HexViewInternal(QWidget *parent)
 	setMinimumHeight(80);
 	setMouseTracking(true);
 	setFocusPolicy(Qt::WheelFocus);
+}
 
-	m_findWidget->hide();
-
-	connect(m_findWidget, &FindWidget::closed, [this]() { update(); });
+BufferedEditor *HexViewInternal::editor()
+{
+	return m_editor;
 }
 
 QString HexViewInternal::toPlainText()
@@ -109,7 +111,7 @@ QPoint HexViewInternal::getByteCoordinates(qint64 index) const
 	return p;
 }
 
-std::optional<HexViewInternal::ByteSelection> HexViewInternal::selection() const
+std::optional<ByteSelection> HexViewInternal::selection() const
 {
 	if (m_selection == Selection::None)
 		return std::optional<ByteSelection>();
@@ -128,6 +130,11 @@ qint64 HexViewInternal::scrollMaximum() const
 {
 	int displayedRows = height() / (m_cellSize + m_cellPadding);
 	return rowCount() - displayedRows + 5;
+}
+
+int HexViewInternal::bytesPerLine() const
+{
+	return m_bytesPerLine;
 }
 
 bool HexViewInternal::canUndo() const
@@ -215,6 +222,9 @@ bool HexViewInternal::openFile(const QString &path)
 	}
 
 	m_editor = new BufferedEditor(&m_file, this);
+	m_findWidget = new FindWidget(this, this);
+	m_findWidget->hide();
+	connect(m_findWidget, &FindWidget::closed, [this]() { update(); });
 
 	setTopRow(0);
 	setFixedWidth(textX(m_bytesPerLine) + m_cellPadding);
@@ -297,6 +307,7 @@ void HexViewInternal::openFindDialog()
 
 void HexViewInternal::updateFindDialogPosition()
 {
+	m_findWidget->setFixedWidth(width());
 	m_findWidget->move(0, height() - m_findWidget->height());
 }
 

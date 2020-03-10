@@ -1,7 +1,7 @@
 #ifndef HEXVIEWINTERNAL_H
 #define HEXVIEWINTERNAL_H
 
-#include "bufferededitor.h"
+#include "common.h"
 
 #include <QWidget>
 #include <QString>
@@ -13,6 +13,7 @@
 
 #include <optional>
 
+class BufferedEditor;
 class GotoDialog;
 class FindWidget;
 
@@ -23,21 +24,17 @@ class HexViewInternal : public QWidget
 	Q_OBJECT
 private:
 	friend class HexView;
+	friend class FindWidget;
 
 	explicit HexViewInternal(QWidget *parent = nullptr);
 
-	struct ByteSelection
-	{
-		qint64 begin, count;
-		ByteSelection(qint64 begin, qint64 count)
-			: begin(begin), count(count) {}
-	};
-
+	BufferedEditor *editor();
 	QString toPlainText();
 	QPoint getByteCoordinates(qint64 index) const;
 	std::optional<ByteSelection> selection() const;
 	qint64 rowCount() const;
 	qint64 scrollMaximum() const;
+	int bytesPerLine() const;
 	bool canUndo() const;
 	bool canRedo() const;
 	bool cursorIsInFindWidget(QPoint cursorPos) const;

@@ -1,6 +1,8 @@
 #ifndef HEXVIEW_H
 #define HEXVIEW_H
 
+#include "common.h"
+
 #include <QWidget>
 
 class HexViewInternal;

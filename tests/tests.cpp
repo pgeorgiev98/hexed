@@ -6,6 +6,7 @@
 #include <algorithm>
 
 #include "bufferededitor.h"
+#include "finder.h"
 
 class TestObject : public QObject
 {
@@ -15,11 +16,13 @@ private slots:
 	void testReading();
 	void testDeleting();
 	void testReadingAndDeleting();
+	void testFindNext();
 
 private:
 	void testReadingHelper(const QByteArray &data, const QVector<int> &indicesToRead);
 	void testDeletingHelper(const QByteArray &data, const QVector<int> &indicesToDelete);
 	void testReadingAndDeletingHelper(const QByteArray &data, const QVector<QPair<int, int>> &indicesToDeleteAndRead);
+	void testFindNextHelper(const QByteArray &data, const QVector<QPair<int, QByteArray>> &queries);
 
 	template <typename R, typename C>
 	C createContainer(int size, std::function<R(int)> func)
@@ -122,6 +125,15 @@ void TestObject::testReadingAndDeleting()
 														   900'000 + (i * 13 + 7) % (100'000 - i)); }));
 }
 
+void TestObject::testFindNext()
+{
+	testFindNextHelper("foo bar baz abb aabbabb aaabbaa", {{0, "aabbaa"}});
+	testFindNextHelper("foo bar foooo abb asdbafwoofofooo aaabbfooaa", {{0, "foo"}});
+
+	testFindNextHelper(createByteArray(100'000, [](int i) { return i; }),
+					   {{0, createByteArray(10, [](int i) { return 100 + i; })}});
+}
+
 void TestObject::testReadingHelper(const QByteArray &data, const QVector<int> &indicesToRead)
 {
 	QTemporaryFile file;
@@ -183,6 +195,40 @@ void TestObject::testReadingAndDeletingHelper(const QByteArray &data, const QVec
 	QVERIFY(file.seek(0));
 	QByteArray actualData = file.readAll();
 	QCOMPARE(actualData, expectedData);
+}
+
+void TestObject::testFindNextHelper(const QByteArray &data, const QVector<QPair<int, QByteArray> > &queries)
+{
+	QTemporaryFile file;
+	QVERIFY(file.open());
+	file.write(data);
+	BufferedEditor e(&file);
+	for (auto q : queries) {
+		Finder *finder = new Finder(&e);
+		finder->search(q.first, q.second);
+
+		qint64 position = q.first;
+		qint64 match;
+		do {
+			finder->findNext();
+
+			match = -1;
+			for (; position < data.size() - q.second.size() + 1; ++position) {
+				int j;
+				for (j = 0; j < q.second.size(); ++j)
+					if (data[int(position) + j] != q.second[j])
+						break;
+				if (j == q.second.size()) {
+					match = position;
+					position += j;
+					break;
+				}
+			}
+
+			qint64 result = finder->searchResultPosition();
+			QCOMPARE(result, match);
+		} while (match != -1);
+	}
 }
 
 QTEST_MAIN(TestObject)

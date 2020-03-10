@@ -19,6 +19,7 @@ CONFIG += c++17
 SOURCES += \
         bufferededitor.cpp \
         expressionvalidator.cpp \
+        finder.cpp \
         findwidget.cpp \
         gotodialog.cpp \
         hexview.cpp \
@@ -28,7 +29,9 @@ SOURCES += \
 
 HEADERS += \
         bufferededitor.h \
+        common.h \
         expressionvalidator.h \
+        finder.h \
         findwidget.h \
         gotodialog.h \
         hexview.h \
