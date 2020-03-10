@@ -34,6 +34,7 @@ private:
 	HexViewInternal *m_hexView;
 	Finder *m_finder;
 
+	bool m_selectionChanged;
 	QLineEdit *m_input;
 	QLabel *m_message;
 };

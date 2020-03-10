@@ -561,6 +561,8 @@ void HexViewInternal::mousePressEvent(QMouseEvent *event)
 
 void HexViewInternal::mouseReleaseEvent(QMouseEvent *)
 {
+	if (m_selecting)
+		emit userChangedSelection();
 	m_selecting = false;
 }
 

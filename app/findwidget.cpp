@@ -26,6 +26,7 @@ FindWidget::FindWidget(HexViewInternal *hexView, QWidget *parent)
 	: QWidget(parent)
 	, m_hexView(hexView)
 	, m_finder(new Finder(m_hexView->editor(), this))
+	, m_selectionChanged(false)
 	, m_input(new QLineEdit)
 	, m_message(new QLabel)
 {
@@ -53,6 +54,8 @@ FindWidget::FindWidget(HexViewInternal *hexView, QWidget *parent)
 	layout->addWidget(down);
 	layout->addWidget(m_message);
 	layout->addWidget(close, 0, Qt::AlignRight);
+
+	connect(m_hexView, &HexViewInternal::userChangedSelection, [this]() { m_selectionChanged = true; });
 
 	connect(close, &QPushButton::clicked, this, &FindWidget::close);
 	connect(m_input, &QLineEdit::textChanged, [this, up, down]() {
@@ -106,9 +109,8 @@ void FindWidget::showEvent(QShowEvent *)
 
 void FindWidget::searchDown()
 {
-	// TODO: reset position when the selection is changed
 	QByteArray sd = searchData();
-	if (m_finder->searchData() != sd) {
+	if (m_finder->searchData() != sd || m_selectionChanged) {
 		qint64 position;
 		auto selection = m_hexView->selection();
 		if (selection)
@@ -116,6 +118,7 @@ void FindWidget::searchDown()
 		else
 			position = m_hexView->m_topRow * m_hexView->m_bytesPerLine;
 		m_finder->search(position, sd);
+		m_selectionChanged = false;
 	}
 
 	// TODO: Make this asynchronous

@@ -45,6 +45,7 @@ signals:
 	void topRowChanged(qint64 topRow);
 	void rowCountChanged();
 	void scrollMaximumChanged();
+	void userChangedSelection();
 
 private slots:
 	void setBytesPerLine(int bytesPerLine);
