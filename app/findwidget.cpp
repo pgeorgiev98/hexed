@@ -62,6 +62,7 @@ FindWidget::FindWidget(HexViewInternal *hexView, QWidget *parent)
 	});
 
 	connect(down, &QPushButton::clicked, this, &FindWidget::searchDown);
+	connect(m_input, &QLineEdit::returnPressed, this, &FindWidget::searchDown);
 }
 
 void FindWidget::close()
