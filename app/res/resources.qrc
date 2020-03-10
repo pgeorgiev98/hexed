@@ -1,0 +1,12 @@
+<!DOCTYPE RCC>
+<RCC version="1.0">
+<qresource>
+<file>icon.ico</file>
+<file>light/up_arrow.svg</file>
+<file>light/down_arrow.svg</file>
+<file>light/cross.svg</file>
+<file>dark/up_arrow.svg</file>
+<file>dark/down_arrow.svg</file>
+<file>dark/cross.svg</file>
+</qresource>
+</RCC>

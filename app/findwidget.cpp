@@ -2,6 +2,7 @@
 #include "bufferededitor.h"
 #include "hexviewinternal.h"
 #include "finder.h"
+#include "iconprovider.h"
 
 #include <QHBoxLayout>
 #include <QLineEdit>
@@ -39,12 +40,11 @@ FindWidget::FindWidget(HexViewInternal *hexView, QWidget *parent)
 	QPushButton *up = new QPushButton;
 	QPushButton *down = new QPushButton;
 	QPushButton *close = new QPushButton;
-	// TODO: Choose icon based on background color
-	up->setIcon(QIcon(":/light/up_arrow.svg"));
+	up->setIcon(IconProvider::getContrastingIcon(IconProvider::upArrow, up));
 	up->setDisabled(true);
-	down->setIcon(QIcon(":/light/down_arrow.svg"));
+	down->setIcon(IconProvider::getContrastingIcon(IconProvider::downArrow, down));
 	down->setDisabled(true);
-	close->setIcon(QIcon(":/light/x.svg"));
+	close->setIcon(IconProvider::getContrastingIcon(IconProvider::cross, close));
 
 	QHBoxLayout *layout = new QHBoxLayout;
 	setLayout(layout);

@@ -24,6 +24,7 @@ SOURCES += \
         gotodialog.cpp \
         hexview.cpp \
         hexviewinternal.cpp \
+        iconprovider.cpp \
         main.cpp \
         mainwindow.cpp
 
@@ -36,9 +37,10 @@ HEADERS += \
         gotodialog.h \
         hexview.h \
         hexviewinternal.h \
+        iconprovider.h \
         mainwindow.h
 
-RESOURCES += resources.qrc
+RESOURCES += res/resources.qrc
 
 # Default rules for deployment.
 qnx: target.path = /tmp/$${TARGET}/bin
