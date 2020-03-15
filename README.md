@@ -1,4 +1,4 @@
-<img src="https://raw.githubusercontent.com/pgeorgiev98/hexed/master/res/icon.png" width="96" height="96" />
+<img src="https://raw.githubusercontent.com/pgeorgiev98/hexed/master/app/res/icon.png" width="96" height="96" />
 
 # Hexed
 
@@ -10,7 +10,7 @@ An open-source, cross-platform binary file hex editor written in C++ with Qt5.
 - [x] Can have many files open at once in tabs
 - [x] Can replace bytes and append bytes to the file
 - [ ] Can insert bytes at any position in the file
-- [ ] Can delete bytes at any position in the file
+- [x] Can delete bytes at any position in the file
 - [x] Supports both hex and ascii keyboard input
 - [ ] Can search the file
 - [x] Has undo and redo functionality
