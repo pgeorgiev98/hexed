@@ -18,6 +18,7 @@ CONFIG += c++17
 
 SOURCES += \
         bufferededitor.cpp \
+        common.cpp \
         expressionvalidator.cpp \
         finder.cpp \
         findwidget.cpp \

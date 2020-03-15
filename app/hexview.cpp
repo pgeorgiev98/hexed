@@ -1,8 +1,13 @@
 #include "hexview.h"
 #include "hexviewinternal.h"
+#include "bufferededitor.h"
+#include "common.h"
 
 #include <QHBoxLayout>
+#include <QVBoxLayout>
+#include <QLabel>
 #include <QScrollBar>
+#include <QStatusBar>
 
 // TODO: Optionally don't scroll in real time while the scrollbar is being dragged
 
@@ -10,13 +15,22 @@ HexView::HexView(QWidget *parent)
 	: QWidget(parent)
 	, m_hexViewInternal(new HexViewInternal)
 	, m_verticalScrollBar(new QScrollBar)
+	, m_statusBar(new QStatusBar)
+	, m_fileSizeLabel(new QLabel)
 {
+	m_statusBar->addPermanentWidget(m_fileSizeLabel);
+
 	QHBoxLayout *hbox = new QHBoxLayout;
+	hbox->setContentsMargins(0, 0, 0, 0);
 	hbox->addWidget(m_hexViewInternal);
 	hbox->addWidget(m_verticalScrollBar, 0, Qt::AlignRight);
-	hbox->setContentsMargins(0, 0, 0, 0);
 
-	setLayout(hbox);
+	QVBoxLayout *vbox = new QVBoxLayout;
+	vbox->setContentsMargins(0, 0, 0, 0);
+	vbox->addLayout(hbox, 1);
+	vbox->addWidget(m_statusBar, 0, Qt::AlignBottom);
+
+	setLayout(vbox);
 
 	connect(m_hexViewInternal, &HexViewInternal::canUndoChanged, this, &HexView::canUndoChanged);
 	connect(m_hexViewInternal, &HexViewInternal::canRedoChanged, this, &HexView::canRedoChanged);
@@ -47,6 +61,16 @@ void HexView::onScrollBarChanged(int value)
 	m_hexViewInternal->setTopRow(topRow);
 }
 
+void HexView::updateStatusBar()
+{
+	qint64 fileSize = m_hexViewInternal->editor()->size();
+	QString fileSizeString;
+	fileSizeString.append(QString("%1B").arg(fileSize));
+	if (fileSize >= 1024)
+		fileSizeString.append(QString(" (%1)").arg(prettySize(fileSize)));
+	m_fileSizeLabel->setText(fileSizeString);
+}
+
 int HexView::scrollStep(qint64 rowCount) const
 {
 	const qint64 maxScrollValue = 2100000000;
@@ -68,7 +92,11 @@ bool HexView::canRedo() const
 
 bool HexView::openFile(const QString &path)
 {
-	return m_hexViewInternal->openFile(path);
+	bool result = m_hexViewInternal->openFile(path);
+	BufferedEditor *editor = m_hexViewInternal->editor();
+	connect(editor, &BufferedEditor::sizeChanged, this, &HexView::updateStatusBar);
+	updateStatusBar();
+	return result;
 }
 
 bool HexView::saveChanges()

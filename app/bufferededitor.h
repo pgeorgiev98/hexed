@@ -50,6 +50,7 @@ public:
 signals:
 	void canUndoChanged(bool canUndo);
 	void canRedoChanged(bool canRedo);
+	void sizeChanged(qint64 size);
 
 private:
 	static const int sectionSize = 16 * 1024;

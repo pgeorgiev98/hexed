@@ -429,6 +429,8 @@ int BufferedEditor::getSectionIndex(qint64 position)
 
 void BufferedEditor::doModification(Modification modification)
 {
+	qint64 oldSize = m_size;
+
 	if (std::holds_alternative<Replacement>(modification)) {
 		Replacement replacement = std::get<Replacement>(modification);
 		int sectionIndex = getSectionIndex(replacement.position);
@@ -470,10 +472,14 @@ void BufferedEditor::doModification(Modification modification)
 	}
 
 	++m_modificationCount;
+	if (m_size != oldSize)
+		emit sizeChanged(m_size);
 }
 
 void BufferedEditor::undoModification(Modification modification)
 {
+	qint64 oldSize = m_size;
+
 	if (std::holds_alternative<Replacement>(modification)) {
 		Replacement replacement = std::get<Replacement>(modification);
 		int sectionIndex = getSectionIndex(replacement.position);
@@ -503,4 +509,6 @@ void BufferedEditor::undoModification(Modification modification)
 	}
 
 	--m_modificationCount;
+	if (m_size != oldSize)
+		emit sizeChanged(m_size);
 }

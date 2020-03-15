@@ -7,6 +7,8 @@
 
 class HexViewInternal;
 class QScrollBar;
+class QStatusBar;
+class QLabel;
 
 class HexView : public QWidget
 {
@@ -34,12 +36,15 @@ private slots:
 	void updateScrollMaximum();
 	void setTopRow(qint64 topRow);
 	void onScrollBarChanged(int value);
+	void updateStatusBar();
 
 	int scrollStep(qint64 rowCount) const;
 
 private:
 	HexViewInternal *m_hexViewInternal;
 	QScrollBar *m_verticalScrollBar;
+	QStatusBar *m_statusBar;
+	QLabel *m_fileSizeLabel;
 };
 
 #endif // HEXVIEW_H
