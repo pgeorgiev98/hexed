@@ -346,6 +346,7 @@ void HexViewInternal::paintEvent(QPaintEvent *event)
 	for (qint64 y = startY, yCoord = m_cellSize; i <= m_editor->size() && y < endY; ++y, yCoord += cellHeight) {
 
 		bool rowIsHovered = m_hoveredIndex == -1 ? false : m_hoveredIndex / 16 == y;
+		qint64 rowDisplayAddress = rowIsHovered ? m_hoveredIndex : m_editor->position();
 
 		painter.setPen(rowIsHovered ? textColor : alternateBackgroundColor);
 		painter.setBrush(y % 2 == 0 ? backgroundColor : alternateBackgroundColor);
@@ -353,7 +354,7 @@ void HexViewInternal::paintEvent(QPaintEvent *event)
 
 		painter.setPen(rowIsHovered ? hoverTextColor : textColor);
 		painter.drawText(QPointF(m_cellSize / 2, yCoord),
-						 QString::number(m_editor->position(), 16).rightJustified(lineNumberDigitsCount(), '0'));
+						 QString::number(rowDisplayAddress, 16).toUpper().rightJustified(lineNumberDigitsCount(), '0'));
 
 		for (qint64 x = 0; i <= m_editor->size() && x < m_bytesPerLine; ++x, ++i) {
 			QPoint cellCoord;
