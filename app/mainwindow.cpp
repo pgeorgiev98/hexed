@@ -21,6 +21,10 @@ MainWindow::MainWindow(QWidget *parent)
 	, m_redoAction(new QAction("&Redo"))
 	, m_gotoAction(new QAction("&Go to"))
 	, m_findAction(new QAction("&Find"))
+	, m_selectAllAction(new QAction("Select &All"))
+	, m_selectNoneAction(new QAction("Select &None"))
+	, m_copyTextAction(new QAction("Copy &text"))
+	, m_copyHexAction(new QAction("Copy &hex"))
 {
 	setCentralWidget(m_tabWidget);
 	resize(640, 480);
@@ -43,6 +47,12 @@ MainWindow::MainWindow(QWidget *parent)
 	m_editMenu->addAction(m_undoAction);
 	m_editMenu->addAction(m_redoAction);
 	m_editMenu->addSeparator();
+	m_editMenu->addAction(m_selectAllAction);
+	m_editMenu->addAction(m_selectNoneAction);
+	m_editMenu->addSeparator();
+	m_editMenu->addAction(m_copyTextAction);
+	m_editMenu->addAction(m_copyHexAction);
+	m_editMenu->addSeparator();
 	m_editMenu->addAction(m_gotoAction);
 	m_editMenu->addAction(m_findAction);
 
@@ -54,6 +64,10 @@ MainWindow::MainWindow(QWidget *parent)
 	connect(m_exitAction, &QAction::triggered, this, &MainWindow::onExitClicked);
 	connect(m_undoAction, &QAction::triggered, this, &MainWindow::undo);
 	connect(m_redoAction, &QAction::triggered, this, &MainWindow::redo);
+	connect(m_selectAllAction, &QAction::triggered, this, &MainWindow::selectAll);
+	connect(m_selectNoneAction, &QAction::triggered, this, &MainWindow::selectNone);
+	connect(m_copyTextAction, &QAction::triggered, this, &MainWindow::copyText);
+	connect(m_copyHexAction, &QAction::triggered, this, &MainWindow::copyHex);
 	connect(m_gotoAction, &QAction::triggered, this, &MainWindow::openGotoDialog);
 	connect(m_findAction, &QAction::triggered, this, &MainWindow::openFindDialog);
 
@@ -68,6 +82,7 @@ bool MainWindow::openFile(const QString &path)
 		m_tabWidget->insertTab(m_tabWidget->count(), tab, path);
 		connect(tab, &HexView::canUndoChanged, this, &MainWindow::onCanUndoChanged);
 		connect(tab, &HexView::canRedoChanged, this, &MainWindow::onCanRedoChanged);
+		connect(tab, &HexView::selectionChanged, this, &MainWindow::onSelectionChanged);
 		m_tabWidget->setCurrentWidget(tab);
 		onTabCountChanged();
 	}
@@ -129,6 +144,34 @@ void MainWindow::redo()
 	tab->redo();
 }
 
+void MainWindow::selectAll()
+{
+	HexView *tab = qobject_cast<HexView *>(m_tabWidget->currentWidget());
+	Q_ASSERT(tab);
+	tab->selectAll();
+}
+
+void MainWindow::selectNone()
+{
+	HexView *tab = qobject_cast<HexView *>(m_tabWidget->currentWidget());
+	Q_ASSERT(tab);
+	tab->selectNone();
+}
+
+void MainWindow::copyText()
+{
+	HexView *tab = qobject_cast<HexView *>(m_tabWidget->currentWidget());
+	Q_ASSERT(tab);
+	tab->copyText();
+}
+
+void MainWindow::copyHex()
+{
+	HexView *tab = qobject_cast<HexView *>(m_tabWidget->currentWidget());
+	Q_ASSERT(tab);
+	tab->copyHex();
+}
+
 void MainWindow::openGotoDialog()
 {
 	HexView *tab = qobject_cast<HexView *>(m_tabWidget->currentWidget());
@@ -149,8 +192,10 @@ void MainWindow::onTabCountChanged()
 	bool hasTabs = m_tabWidget->count() > 0;
 	m_saveAction->setEnabled(hasTabs);
 	m_gotoAction->setEnabled(hasTabs);
+	m_selectAllAction->setEnabled(hasTabs);
 	onCanUndoChanged();
 	onCanRedoChanged();
+	onSelectionChanged();
 }
 
 void MainWindow::onCanUndoChanged()
@@ -173,4 +218,17 @@ void MainWindow::onCanRedoChanged()
 	HexView *tab = qobject_cast<HexView *>(m_tabWidget->currentWidget());
 	Q_ASSERT(tab);
 	m_redoAction->setEnabled(tab->canRedo());
+}
+
+void MainWindow::onSelectionChanged()
+{
+	bool hasSelection = false;
+	if (m_tabWidget->count() > 0) {
+		HexView *tab = qobject_cast<HexView *>(m_tabWidget->currentWidget());
+		Q_ASSERT(tab);
+		hasSelection = tab->selection().has_value();
+	}
+	m_selectNoneAction->setEnabled(hasSelection);
+	m_copyTextAction->setEnabled(hasSelection);
+	m_copyHexAction->setEnabled(hasSelection);
 }

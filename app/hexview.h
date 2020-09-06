@@ -4,6 +4,7 @@
 #include "common.h"
 
 #include <QWidget>
+#include <optional>
 
 class HexViewInternal;
 class QScrollBar;
@@ -16,6 +17,8 @@ class HexView : public QWidget
 public:
 	explicit HexView(QWidget *parent = nullptr);
 
+	std::optional<ByteSelection> selection() const;
+
 public slots:
 	bool canUndo() const;
 	bool canRedo() const;
@@ -25,12 +28,17 @@ public slots:
 	bool quit();
 	void undo();
 	void redo();
+	void selectAll();
+	void selectNone();
+	void copyText();
+	void copyHex();
 	void openGotoDialog();
 	void openFindDialog();
 
 signals:
 	void canUndoChanged(bool canUndo);
 	void canRedoChanged(bool canRedo);
+	void selectionChanged();
 
 private slots:
 	void updateScrollMaximum();

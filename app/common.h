@@ -13,6 +13,15 @@ struct ByteSelection
 	qint64 begin, count;
 	Type type;
 
+	bool operator==(const ByteSelection &other) const
+	{
+		return begin == other.begin && count == other.count && type == other.type;
+	}
+
+	bool operator!=(const ByteSelection &other) const
+	{
+		return !(*this == other);
+	}
 };
 
 QString prettySize(qint64 bytes);

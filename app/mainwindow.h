@@ -22,6 +22,10 @@ public slots:
 	void onExitClicked();
 	void undo();
 	void redo();
+	void selectAll();
+	void selectNone();
+	void copyText();
+	void copyHex();
 	void openGotoDialog();
 	void openFindDialog();
 
@@ -29,6 +33,7 @@ private slots:
 	void onTabCountChanged();
 	void onCanUndoChanged();
 	void onCanRedoChanged();
+	void onSelectionChanged();
 
 private:
 	QTabWidget *m_tabWidget;
@@ -42,6 +47,10 @@ private:
 
 	QAction *m_undoAction;
 	QAction *m_redoAction;
+	QAction *m_selectAllAction;
+	QAction *m_selectNoneAction;
+	QAction *m_copyTextAction;
+	QAction *m_copyHexAction;
 	QAction *m_gotoAction;
 	QAction *m_findAction;
 };

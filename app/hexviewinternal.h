@@ -51,7 +51,9 @@ signals:
 private slots:
 	void setBytesPerLine(int bytesPerLine);
 	void highlight(ByteSelection selection);
+	void selectAll();
 	void selectNone();
+	void copy(ByteSelection selection);
 	void setFont(QFont font);
 	void setTopRow(qint64 topRow);
 	bool openFile(const QString &path);

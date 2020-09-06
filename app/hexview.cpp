@@ -39,7 +39,13 @@ HexView::HexView(QWidget *parent)
 	connect(m_hexViewInternal, &HexViewInternal::rowCountChanged, this, &HexView::updateScrollMaximum);
 	connect(m_hexViewInternal, &HexViewInternal::topRowChanged, this, &HexView::setTopRow);
 	connect(m_hexViewInternal, &HexViewInternal::scrollMaximumChanged, this, &HexView::updateScrollMaximum);
+	connect(m_hexViewInternal, &HexViewInternal::selectionChanged, this, &HexView::selectionChanged);
 	connect(m_verticalScrollBar, &QScrollBar::valueChanged, this, &HexView::onScrollBarChanged);
+}
+
+std::optional<ByteSelection> HexView::selection() const
+{
+	return m_hexViewInternal->selection();
 }
 
 void HexView::updateScrollMaximum()
@@ -136,6 +142,30 @@ void HexView::undo()
 void HexView::redo()
 {
 	m_hexViewInternal->redo();
+}
+
+void HexView::selectAll()
+{
+	m_hexViewInternal->selectAll();
+}
+
+void HexView::selectNone()
+{
+	m_hexViewInternal->selectNone();
+}
+
+void HexView::copyText()
+{
+	ByteSelection selection = *m_hexViewInternal->selection();
+	selection.type = ByteSelection::Type::Text;
+	m_hexViewInternal->copy(selection);
+}
+
+void HexView::copyHex()
+{
+	ByteSelection selection = *m_hexViewInternal->selection();
+	selection.type = ByteSelection::Type::Cells;
+	m_hexViewInternal->copy(selection);
 }
 
 void HexView::openGotoDialog()

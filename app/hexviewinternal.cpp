@@ -179,7 +179,6 @@ void HexViewInternal::highlight(ByteSelection selection)
 	m_selecting = false;
 
 	update();
-	emit selectionChanged();
 }
 
 void HexViewInternal::setSelection(ByteSelection selection)
@@ -201,7 +200,16 @@ void HexViewInternal::setSelection(ByteSelection selection)
 	selection.begin = begin;
 	selection.count = count;
 
+	bool changed = (!m_selection.has_value() || *m_selection != selection);
 	m_selection = selection;
+
+	if (changed)
+		emit selectionChanged();
+}
+
+void HexViewInternal::selectAll()
+{
+	highlight(ByteSelection(0, m_editor->size(), ByteSelection::Cells));
 }
 
 void HexViewInternal::selectNone()
@@ -212,6 +220,29 @@ void HexViewInternal::selectNone()
 
 	update();
 	emit selectionChanged();
+}
+
+void HexViewInternal::copy(ByteSelection selection)
+{
+	QClipboard *clipboard = QGuiApplication::clipboard();
+	QString s;
+	m_editor->seek(selection.begin);
+	if (selection.type == ByteSelection::Type::Text) {
+		while (m_editor->position() < selection.begin + selection.count) {
+			char b = *m_editor->getByte().current;
+			s.append((b >= 32 && b <= 126) ? b : '.');
+		}
+	} else {
+		QString cell = "00 ";
+		while (m_editor->position() < selection.begin + selection.count) {
+			unsigned char byte = static_cast<unsigned char>(*m_editor->getByte().current);
+			cell[0] = hexTable[(byte >> 4) & 0xF];
+			cell[1] = hexTable[(byte >> 0) & 0xF];
+			s.append(cell);
+		}
+		s.remove(s.size() - 1, 1);
+	}
+	clipboard->setText(s);
 }
 
 void HexViewInternal::setFont(QFont font)
@@ -485,7 +516,6 @@ void HexViewInternal::mouseMoveEvent(QMouseEvent *event)
 			++count;
 
 		setSelection(ByteSelection(begin, count, m_selection->type));
-		emit selectionChanged();
 	} else {
 		m_hoveredIndex = hoverCellIndex != -1 ? hoverCellIndex : hoverTextIndex;
 	}
@@ -539,29 +569,11 @@ void HexViewInternal::mousePressEvent(QMouseEvent *event)
 		QAction *a = menu.exec();
 
 		if (a == &copyTextAction) {
-			QString s;
-			m_editor->seek(begin);
-			while (m_editor->position() < begin + count) {
-				char b = *m_editor->getByte().current;
-				s.append((b >= 32 && b <= 126) ? b : '.');
-			}
-			QClipboard *clipboard = QGuiApplication::clipboard();
-			clipboard->setText(s);
+			copy(ByteSelection(begin, count, ByteSelection::Type::Text));
 		} else if (a == &copyHexAction) {
-			QString cell = "00 ";
-			QString s;
-			m_editor->seek(begin);
-			while (m_editor->position() < begin + count) {
-				unsigned char byte = static_cast<unsigned char>(*m_editor->getByte().current);
-				cell[0] = hexTable[(byte >> 4) & 0xF];
-				cell[1] = hexTable[(byte >> 0) & 0xF];
-				s.append(cell);
-			}
-			s.remove(s.size() - 1, 1);
-			QClipboard *clipboard = QGuiApplication::clipboard();
-			clipboard->setText(s);
+			copy(ByteSelection(begin, count, ByteSelection::Type::Cells));
 		} else if (a == &selectAllAction) {
-			highlight(ByteSelection(0, m_editor->size(), *type));
+			selectAll();
 		} else if (a == &selectNoneAction) {
 			selectNone();
 		}
@@ -572,8 +584,9 @@ void HexViewInternal::mousePressEvent(QMouseEvent *event)
 			setSelection(ByteSelection(hoverCellIndex, 1, ByteSelection::Type::Cells));
 		else if (hoverTextIndex != -1)
 			setSelection(ByteSelection(hoverTextIndex, 1, ByteSelection::Type::Text));
+		else
+			emit selectionChanged();
 		m_selecting = m_selection.has_value();
-		emit selectionChanged();
 		update();
 	}
 }
