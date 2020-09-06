@@ -20,8 +20,6 @@
 #include <QtMath>
 #include <QMessageBox>
 
-#include <QDebug>
-
 static QColor backgroundColor("#ffffff");
 static QColor alternateBackgroundColor("#aaaaaa");
 static QColor textColor("#000000");
@@ -176,12 +174,34 @@ void HexViewInternal::setBytesPerLine(int bytesPerLine)
 
 void HexViewInternal::highlight(ByteSelection selection)
 {
-	m_selection = selection;
+	setSelection(selection);
 	m_selectingRows = false;
 	m_selecting = false;
 
 	update();
 	emit selectionChanged();
+}
+
+void HexViewInternal::setSelection(ByteSelection selection)
+{
+	qint64 begin = selection.begin;
+	qint64 count = selection.count;
+
+	// Don't allow the EOF byte to be selected with other bytes
+	if (m_selectingRows && begin >= m_editor->size()) {
+		qint64 end = begin + count + 1;
+		begin = m_editor->size() - 1;
+		count = end - begin - 1;
+	} else if (begin == m_editor->size()) {
+		count = 1;
+	} else {
+		count = qMin(count, m_editor->size() - begin);
+	}
+
+	selection.begin = begin;
+	selection.count = count;
+
+	m_selection = selection;
 }
 
 void HexViewInternal::selectNone()
@@ -332,7 +352,6 @@ void HexViewInternal::paintEvent(QPaintEvent *event)
 			selectionEnd = selectionOp->begin + selectionOp->count;
 		}
 	}
-	qDebug() << selectionStart << selectionEnd;
 
 	QString cellText = "FF";
 	QString ch = "a";
@@ -410,7 +429,7 @@ void HexViewInternal::paintEvent(QPaintEvent *event)
 				else
 					painter.setPen(textColor);
 
-				if (!(m_editingCell && i >= selectionStart && i <= selectionEnd))
+				if (!(m_editingCell && i >= selectionStart && i < selectionEnd))
 					painter.drawText(cellCoord, cellText);
 				else
 					painter.drawText(cellCoord.x() + m_characterWidth / 2, cellCoord.y(),
@@ -441,17 +460,21 @@ void HexViewInternal::mouseMoveEvent(QMouseEvent *event)
 
 	if (m_selecting && m_selection->begin != m_editor->size()) {
 		m_hoveredIndex = m_selection->type == ByteSelection::Type::Cells ? hoverCellIndex : hoverTextIndex;
-		qint64 begin = m_selection->begin;
+		// The end is inclusive
+		qint64 begin;
 		qint64 end;
 		if (m_selectingRows) {
-			if (m_hoveredIndex >= m_selection->begin) {
-				end = m_bytesPerLine * ((m_hoveredIndex % m_bytesPerLine > 0) + m_hoveredIndex / m_bytesPerLine) - 1;
-				begin = m_bytesPerLine * (begin / m_bytesPerLine);
+			qint64 hoveredLine = m_hoveredIndex / m_bytesPerLine;
+			qint64 beginLine = m_selection->begin / m_bytesPerLine;
+			if (hoveredLine >= beginLine) {
+				begin = beginLine * m_bytesPerLine;
+				end = hoveredLine * m_bytesPerLine + m_bytesPerLine - 1;
 			} else {
-				end = m_bytesPerLine * (m_hoveredIndex / m_bytesPerLine) - 1;
-				begin = m_bytesPerLine * ((begin % m_bytesPerLine > 0) + begin / m_bytesPerLine) - 1;
+				begin = beginLine * m_bytesPerLine + m_bytesPerLine - 1;
+				end = hoveredLine * m_bytesPerLine;
 			}
 		} else {
+			begin = m_selection->begin;
 			end = m_hoveredIndex;
 		}
 
@@ -461,7 +484,7 @@ void HexViewInternal::mouseMoveEvent(QMouseEvent *event)
 		else
 			++count;
 
-		m_selection = ByteSelection(begin, count, m_selection->type);
+		setSelection(ByteSelection(begin, count, m_selection->type));
 		emit selectionChanged();
 	} else {
 		m_hoveredIndex = hoverCellIndex != -1 ? hoverCellIndex : hoverTextIndex;
@@ -544,12 +567,12 @@ void HexViewInternal::mousePressEvent(QMouseEvent *event)
 		}
 	} else {
 		m_selection.reset();
-		if (hoverCellIndex != -1)
-			m_selection = ByteSelection(hoverCellIndex, 1, ByteSelection::Type::Cells);
-		else if (hoverTextIndex != -1)
-			m_selection = ByteSelection(hoverTextIndex, 1, ByteSelection::Type::Text);
-		m_selecting = m_selection.has_value();
 		m_selectingRows = false;
+		if (hoverCellIndex != -1)
+			setSelection(ByteSelection(hoverCellIndex, 1, ByteSelection::Type::Cells));
+		else if (hoverTextIndex != -1)
+			setSelection(ByteSelection(hoverTextIndex, 1, ByteSelection::Type::Text));
+		m_selecting = m_selection.has_value();
 		emit selectionChanged();
 		update();
 	}
@@ -568,9 +591,9 @@ void HexViewInternal::mouseDoubleClickEvent(QMouseEvent *event)
 	qint64 hoverTextIndex = getHoverText(event->pos());
 
 	if (hoverCellIndex != -1)
-		m_selection = ByteSelection(m_bytesPerLine * (hoverCellIndex / m_bytesPerLine), m_bytesPerLine, ByteSelection::Type::Cells);
+		setSelection(ByteSelection(m_bytesPerLine * (hoverCellIndex / m_bytesPerLine), m_bytesPerLine, ByteSelection::Type::Cells));
 	else if (hoverTextIndex != -1)
-		m_selection = ByteSelection(m_bytesPerLine * (hoverTextIndex / m_bytesPerLine), m_bytesPerLine, ByteSelection::Type::Text);
+		setSelection(ByteSelection(m_bytesPerLine * (hoverTextIndex / m_bytesPerLine), m_bytesPerLine, ByteSelection::Type::Text));
 
 	if (hoverCellIndex != -1 || hoverTextIndex != -1) {
 		m_selecting = true;
@@ -615,14 +638,16 @@ void HexViewInternal::keyPressEvent(QKeyEvent *event)
 	};
 	bool keyIsHexDigit = hexDigits.contains(key);
 	auto putByte = [this]() {
-		m_editor->seek(m_selection->begin);
+		m_editor->seek(selection()->begin);
 		if (m_editor->atEnd()) {
 			qint64 prevRowCount = rowCount();
 			m_editor->insertByte(m_editingCellByte);
 			if (prevRowCount != rowCount())
 				emit rowCountChanged();
 		} else {
-			while (m_editor->position() < m_selection->begin + m_selection->count) {
+			ByteSelection normalizedSelection = *selection();
+			qint64 end = normalizedSelection.begin + normalizedSelection.count;
+			while (m_editor->position() < end) {
 				m_editor->replaceByte(m_editingCellByte);
 				m_editor->moveForward();
 			}
@@ -647,8 +672,10 @@ void HexViewInternal::keyPressEvent(QKeyEvent *event)
 				m_editingCellByte |= char(QString(char(key)).toInt(nullptr, 16));
 				putByte();
 				if (m_selection->count == 1) {
-					++m_selection->begin;
-					emit selectionChanged();
+					m_selectingRows = false;
+					ByteSelection newSelection = *m_selection;
+					++newSelection.begin;
+					setSelection(newSelection);
 				}
 				update();
 				return;
@@ -665,21 +692,24 @@ void HexViewInternal::keyPressEvent(QKeyEvent *event)
 		if (text.size() == 1) {
 			char byte = text[0].toLatin1();
 			if (byte >= 32 && byte < 127) {
-				m_editor->seek(m_selection->begin);
+				m_editor->seek(selection()->begin);
 				if (m_editor->atEnd()) {
 					qint64 prevRowCount = rowCount();
 					m_editor->insertByte(byte);
 					if (prevRowCount != rowCount())
 						emit rowCountChanged();
 				} else {
-					while (m_editor->position() < m_selection->begin + m_selection->count) {
+					ByteSelection normalizedSelection = *selection();
+					qint64 end = normalizedSelection.begin + normalizedSelection.count;
+					while (m_editor->position() < end) {
 						m_editor->replaceByte(byte);
 						m_editor->moveForward();
 					}
 				}
 				if (m_selection->count == 1) {
-					++m_selection->begin;
-					emit selectionChanged();
+					ByteSelection newSelection = *m_selection;
+					++newSelection.begin;
+					setSelection(newSelection);
 				}
 				update();
 				return;
@@ -703,8 +733,9 @@ void HexViewInternal::keyPressEvent(QKeyEvent *event)
 		case Qt::Key_Down:
 			move = m_bytesPerLine; break;
 		}
-		m_selection->begin += move;
-		emit selectionChanged();
+		ByteSelection newSelection = *m_selection;
+		newSelection.begin += move;
+		setSelection(newSelection);
 		update();
 	} else if (key == Qt::Key_Delete || key == Qt::Key_Backspace) {
 		ByteSelection sel = *selection();

@@ -63,6 +63,9 @@ private slots:
 	void openFindDialog();
 	void updateFindDialogPosition();
 
+private:
+	void setSelection(ByteSelection selection);
+
 protected:
 	void paintEvent(QPaintEvent *) override;
 	void resizeEvent(QResizeEvent *) override;
