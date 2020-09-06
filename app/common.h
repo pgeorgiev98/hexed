@@ -6,9 +6,13 @@
 
 struct ByteSelection
 {
+	enum Type { Cells, Text };
+	ByteSelection(qint64 begin, qint64 count, Type type = Type::Cells)
+		: begin(begin), count(count), type(type) {}
+
 	qint64 begin, count;
-	ByteSelection(qint64 begin, qint64 count)
-		: begin(begin), count(count) {}
+	Type type;
+
 };
 
 QString prettySize(qint64 bytes);

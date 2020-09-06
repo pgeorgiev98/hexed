@@ -17,7 +17,9 @@ HexView::HexView(QWidget *parent)
 	, m_verticalScrollBar(new QScrollBar)
 	, m_statusBar(new QStatusBar)
 	, m_fileSizeLabel(new QLabel)
+	, m_selectionLabel(new QLabel)
 {
+	m_statusBar->addPermanentWidget(m_selectionLabel);
 	m_statusBar->addPermanentWidget(m_fileSizeLabel);
 
 	QHBoxLayout *hbox = new QHBoxLayout;
@@ -63,12 +65,28 @@ void HexView::onScrollBarChanged(int value)
 
 void HexView::updateStatusBar()
 {
+	// File size
 	qint64 fileSize = m_hexViewInternal->editor()->size();
 	QString fileSizeString;
 	fileSizeString.append(QString("%1B").arg(fileSize));
 	if (fileSize >= 1024)
 		fileSizeString.append(QString(" (%1)").arg(prettySize(fileSize)));
 	m_fileSizeLabel->setText(fileSizeString);
+
+	// Selection
+	auto selection = m_hexViewInternal->selection();
+	QString selectionText;
+	if (selection) {
+		ByteSelection sel = *selection;
+		if (sel.count == 1)
+			selectionText = QString("Selected 0x%1").arg(sel.begin, m_hexViewInternal->lineNumberDigitsCount(), 16, QChar('0'));
+		else if (sel.count > 1)
+			selectionText = QString("Selected %1 bytes (0x%2 to 0x%3)")
+					.arg(sel.count)
+					.arg(sel.begin, m_hexViewInternal->lineNumberDigitsCount(), 16, QChar('0'))
+					.arg(sel.begin + sel.count - 1, m_hexViewInternal->lineNumberDigitsCount(), 16, QChar('0'));
+	}
+	m_selectionLabel->setText(selectionText);
 }
 
 int HexView::scrollStep(qint64 rowCount) const
@@ -95,6 +113,7 @@ bool HexView::openFile(const QString &path)
 	bool result = m_hexViewInternal->openFile(path);
 	BufferedEditor *editor = m_hexViewInternal->editor();
 	connect(editor, &BufferedEditor::sizeChanged, this, &HexView::updateStatusBar);
+	connect(m_hexViewInternal, &HexViewInternal::selectionChanged, this, &HexView::updateStatusBar);
 	updateStatusBar();
 	return result;
 }

@@ -46,6 +46,7 @@ signals:
 	void rowCountChanged();
 	void scrollMaximumChanged();
 	void userChangedSelection();
+	void selectionChanged();
 
 private slots:
 	void setBytesPerLine(int bytesPerLine);
@@ -80,16 +81,11 @@ private:
 	int m_cellSize, m_cellPadding;
 	int m_bytesPerLine;
 	qint64 m_hoveredIndex;
-	qint64 m_selectionStart;
-	qint64 m_selectionEnd;
-	enum class Selection {
-		None = 0,
-		Cells,
-		CellRows,
-		Text,
-		TextRows,
-	} m_selection;
+
+	std::optional<ByteSelection> m_selection;
+	bool m_selectingRows;
 	bool m_selecting;
+
 	QFile m_file;
 	BufferedEditor *m_editor;
 	qint64 m_topRow;

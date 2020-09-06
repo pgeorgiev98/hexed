@@ -45,6 +45,7 @@ private:
 	QScrollBar *m_verticalScrollBar;
 	QStatusBar *m_statusBar;
 	QLabel *m_fileSizeLabel;
+	QLabel *m_selectionLabel;
 };
 
 #endif // HEXVIEW_H
