@@ -211,6 +211,7 @@ void MainWindow::onTabCountChanged()
 	bool hasTabs = m_tabWidget->count() > 0;
 	m_saveAction->setEnabled(hasTabs);
 	m_gotoAction->setEnabled(hasTabs);
+	m_findAction->setEnabled(hasTabs);
 	m_selectAllAction->setEnabled(hasTabs);
 	onCanUndoChanged();
 	onCanRedoChanged();
