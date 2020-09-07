@@ -1,5 +1,6 @@
 #include "mainwindow.h"
 #include "hexview.h"
+#include "baseconverter.h"
 
 #include <QMessageBox>
 #include <QMenuBar>
@@ -14,20 +15,25 @@ MainWindow::MainWindow(QWidget *parent)
 	, m_tabWidget(new QTabWidget)
 	, m_fileMenu(new QMenu("&File"))
 	, m_editMenu(new QMenu("&Edit"))
+	, m_toolsMenu(new QMenu("&Tools"))
 	, m_openAction(new QAction("&Open"))
 	, m_saveAction(new QAction("&Save"))
 	, m_exitAction(new QAction("&Exit"))
 	, m_undoAction(new QAction("&Undo"))
 	, m_redoAction(new QAction("&Redo"))
-	, m_gotoAction(new QAction("&Go to"))
-	, m_findAction(new QAction("&Find"))
 	, m_selectAllAction(new QAction("Select &All"))
 	, m_selectNoneAction(new QAction("Select &None"))
 	, m_copyTextAction(new QAction("Copy &text"))
 	, m_copyHexAction(new QAction("Copy &hex"))
+	, m_gotoAction(new QAction("&Go to"))
+	, m_findAction(new QAction("&Find"))
+	, m_baseConverterAction(new QAction("Base &Converter"))
+	, m_baseConverter(new BaseConverter(this))
 {
 	setCentralWidget(m_tabWidget);
 	resize(640, 480);
+
+	m_baseConverter->hide();
 
 	m_tabWidget->setTabsClosable(true);
 	connect(m_tabWidget, &QTabWidget::tabCloseRequested, this, &MainWindow::closeTab);
@@ -56,12 +62,16 @@ MainWindow::MainWindow(QWidget *parent)
 	m_editMenu->addAction(m_gotoAction);
 	m_editMenu->addAction(m_findAction);
 
+	m_toolsMenu->addAction(m_baseConverterAction);
+
 	menuBar()->addMenu(m_fileMenu);
 	menuBar()->addMenu(m_editMenu);
+	menuBar()->addMenu(m_toolsMenu);
 
 	connect(m_openAction, &QAction::triggered, this, &MainWindow::onOpenClicked);
 	connect(m_saveAction, &QAction::triggered, this, &MainWindow::saveChanges);
 	connect(m_exitAction, &QAction::triggered, this, &MainWindow::onExitClicked);
+
 	connect(m_undoAction, &QAction::triggered, this, &MainWindow::undo);
 	connect(m_redoAction, &QAction::triggered, this, &MainWindow::redo);
 	connect(m_selectAllAction, &QAction::triggered, this, &MainWindow::selectAll);
@@ -70,6 +80,8 @@ MainWindow::MainWindow(QWidget *parent)
 	connect(m_copyHexAction, &QAction::triggered, this, &MainWindow::copyHex);
 	connect(m_gotoAction, &QAction::triggered, this, &MainWindow::openGotoDialog);
 	connect(m_findAction, &QAction::triggered, this, &MainWindow::openFindDialog);
+
+	connect(m_baseConverterAction, &QAction::triggered, this, &MainWindow::openBaseConverter);
 
 	onTabCountChanged();
 }
@@ -184,6 +196,13 @@ void MainWindow::openFindDialog()
 	HexView *tab = qobject_cast<HexView *>(m_tabWidget->currentWidget());
 	Q_ASSERT(tab);
 	tab->openFindDialog();
+}
+
+void MainWindow::openBaseConverter()
+{
+	m_baseConverter->show();
+	m_baseConverter->activateWindow();
+	m_baseConverter->raise();
 }
 
 

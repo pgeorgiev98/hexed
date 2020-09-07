@@ -3,6 +3,8 @@
 
 #include <QMainWindow>
 
+class BaseConverter;
+
 class QTabWidget;
 class QMenu;
 class QAction;
@@ -28,6 +30,7 @@ public slots:
 	void copyHex();
 	void openGotoDialog();
 	void openFindDialog();
+	void openBaseConverter();
 
 private slots:
 	void onTabCountChanged();
@@ -40,6 +43,7 @@ private:
 
 	QMenu *m_fileMenu;
 	QMenu *m_editMenu;
+	QMenu *m_toolsMenu;
 
 	QAction *m_openAction;
 	QAction *m_saveAction;
@@ -53,6 +57,10 @@ private:
 	QAction *m_copyHexAction;
 	QAction *m_gotoAction;
 	QAction *m_findAction;
+
+	QAction *m_baseConverterAction;
+
+	BaseConverter *m_baseConverter;
 };
 
 #endif // MAINWINDOW_H

@@ -17,6 +17,7 @@ DEFINES += QT_DEPRECATED_WARNINGS
 CONFIG += c++17
 
 SOURCES += \
+        baseconverter.cpp \
         bufferededitor.cpp \
         common.cpp \
         expressionvalidator.cpp \
@@ -30,6 +31,7 @@ SOURCES += \
         mainwindow.cpp
 
 HEADERS += \
+        baseconverter.h \
         bufferededitor.h \
         common.h \
         expressionvalidator.h \
