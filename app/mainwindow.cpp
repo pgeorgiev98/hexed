@@ -250,8 +250,8 @@ void MainWindow::onSelectionChanged()
 		hasSelection = tab->selection().has_value();
 
 		auto selection = tab->selection();
-		if (selection && selection->count <= 8) {
-			auto editor = tab->editor();
+		auto editor = tab->editor();
+		if (selection && selection->count <= 8 && selection->begin != editor->size()) {
 			editor->seek(selection->begin);
 			QByteArray bytes;
 			for (int i = 0; i < selection->count; ++i)

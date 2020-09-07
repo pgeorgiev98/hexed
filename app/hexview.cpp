@@ -87,18 +87,22 @@ void HexView::updateStatusBar()
 		ByteSelection sel = *selection;
 
 		QByteArray bytes;
-		if (sel.count <= 4) {
-			auto editor = m_hexViewInternal->editor();
+		auto editor = m_hexViewInternal->editor();
+		if (sel.count <= 4 && sel.begin != editor->size()) {
 			editor->seek(sel.begin);
 			for (int i = 0; i < sel.count; ++i)
 				bytes.append(quint8(*(editor->getByte().current)));
 		}
 
-		if (sel.count == 1) {
+		if (sel.begin == editor->size()) {
+			selectionText = QString("Selected 0x%1")
+					.arg(sel.begin, m_hexViewInternal->lineNumberDigitsCount(), 16, QChar('0'));
 
+		} else if (sel.count == 1) {
 			selectionText = QString("Selected 0x%1, Dec: %2")
 					.arg(sel.begin, m_hexViewInternal->lineNumberDigitsCount(), 16, QChar('0'))
 					.arg(quint64(quint8(bytes[0])));
+
 		} else if (sel.count > 1) {
 			selectionText = QString("Selected %1 bytes (0x%2 to 0x%3)")
 					.arg(sel.count)
@@ -110,6 +114,7 @@ void HexView::updateStatusBar()
 				quint64 be = EndianConverter::bigEndianToNumber(bytes);
 				selectionText.append(QString(", LE: %1, BE: %2").arg(le).arg(be));
 			}
+
 		}
 	}
 	m_selectionLabel->setText(selectionText);
