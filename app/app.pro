@@ -20,6 +20,7 @@ SOURCES += \
         baseconverter.cpp \
         bufferededitor.cpp \
         common.cpp \
+        endianconverter.cpp \
         expressionvalidator.cpp \
         finder.cpp \
         findwidget.cpp \
@@ -34,6 +35,7 @@ HEADERS += \
         baseconverter.h \
         bufferededitor.h \
         common.h \
+        endianconverter.h \
         expressionvalidator.h \
         finder.h \
         findwidget.h \

@@ -1,6 +1,7 @@
 #include "mainwindow.h"
 #include "hexview.h"
 #include "baseconverter.h"
+#include "bufferededitor.h"
 
 #include <QMessageBox>
 #include <QMenuBar>
@@ -247,6 +248,16 @@ void MainWindow::onSelectionChanged()
 		HexView *tab = qobject_cast<HexView *>(m_tabWidget->currentWidget());
 		Q_ASSERT(tab);
 		hasSelection = tab->selection().has_value();
+
+		auto selection = tab->selection();
+		if (selection && selection->count <= 8) {
+			auto editor = tab->editor();
+			editor->seek(selection->begin);
+			QByteArray bytes;
+			for (int i = 0; i < selection->count; ++i)
+				bytes.append(quint8(*(editor->getByte().current)));
+			m_baseConverter->setFromBytes(bytes);
+		}
 	}
 	m_selectNoneAction->setEnabled(hasSelection);
 	m_copyTextAction->setEnabled(hasSelection);

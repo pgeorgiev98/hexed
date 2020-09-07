@@ -1,35 +1,69 @@
 #include "baseconverter.h"
+#include "endianconverter.h"
+
 #include <QGridLayout>
+#include <QHBoxLayout>
 #include <QLabel>
 #include <QLineEdit>
 #include <QKeyEvent>
+#include <QRadioButton>
+#include <QSettings>
+
+static const QString settingsEndianKey = "baseconverter_endianness";
 
 BaseConverter::BaseConverter(QWidget *parent)
 	: QWidget(parent)
-	, m_bin(new QLineEdit)
-	, m_oct(new QLineEdit)
-	, m_dec(new QLineEdit)
-	, m_hex(new QLineEdit)
+	, m_bases({
+			  Base{"Bin", new QLineEdit, 2},
+			  Base{"Oct", new QLineEdit, 8},
+			  Base{"Dec", new QLineEdit, 10},
+			  Base{"Hex", new QLineEdit, 16},
+			  })
+	, m_littleEndianButton(new QRadioButton("Little Endian"))
+	, m_bigEndianButton(new QRadioButton("Big Endian"))
+	, m_value(0)
 {
 	setWindowFlag(Qt::WindowType::Dialog);
 
+	// Load saved settings
+	QSettings settings;
+	if ("big" == settings.value(settingsEndianKey).toString())
+		m_endian = Endian::Big;
+	else
+		m_endian = Endian::Little;
+
+	// The main widget layout
 	QGridLayout *layout = new QGridLayout;
 	setLayout(layout);
-
 	int row = 0;
-	layout->addWidget(new QLabel("Binary: "), row, 0);
-	layout->addWidget(m_bin, row++, 1);
-	layout->addWidget(new QLabel("Octal: "), row, 0);
-	layout->addWidget(m_oct, row++, 1);
-	layout->addWidget(new QLabel("Decimal: "), row, 0);
-	layout->addWidget(m_dec, row++, 1);
-	layout->addWidget(new QLabel("Hexadecimal: "), row, 0);
-	layout->addWidget(m_hex, row++, 1);
 
-	for (QLineEdit *e : {m_bin, m_oct, m_dec, m_hex}) {
-		e->setAlignment(Qt::AlignRight);
-		connect(e, &QLineEdit::textEdited, this, &BaseConverter::updateValues);
+	// Endianness radio buttons
+	{
+		QHBoxLayout *l = new QHBoxLayout;
+		l->addWidget(m_littleEndianButton);
+		l->addWidget(m_bigEndianButton);
+		layout->addLayout(l, row++, 0, 1, 2);
+		m_littleEndianButton->setChecked(m_endian == Endian::Little);
+		m_bigEndianButton->setChecked(m_endian == Endian::Big);
+		connect(m_littleEndianButton, &QRadioButton::toggled, this, &BaseConverter::onLittleEndianToggled);
+		connect(m_bigEndianButton, &QRadioButton::toggled, this, &BaseConverter::onBigEndianToggled);
 	}
+
+	// The value input fields
+	for (const Base &base : m_bases) {
+		layout->addWidget(new QLabel(base.name), row, 0);
+		layout->addWidget(base.widget, row++, 1);
+		base.widget->setAlignment(Qt::AlignRight);
+		connect(base.widget, &QLineEdit::textEdited, this, &BaseConverter::updateValues);
+	}
+}
+
+void BaseConverter::setFromBytes(const QByteArray &bytes)
+{
+	if (m_endian == Endian::Little)
+		setValue(EndianConverter::littleEndianToNumber(bytes));
+	else
+		setValue(EndianConverter::bigEndianToNumber(bytes));
 }
 
 void BaseConverter::updateValues()
@@ -38,20 +72,8 @@ void BaseConverter::updateValues()
 	if (w == nullptr)
 		return;
 
-	struct Base
-	{
-		QLineEdit *widget;
-		int base;
-	};
-	QVector<Base> bases = {
-		{m_bin, 2},
-		{m_oct, 8},
-		{m_dec, 10},
-		{m_hex, 16},
-	};
-
 	int base = 0;
-	for (Base b : bases) {
+	for (Base b : m_bases) {
 		if (b.widget == w) {
 			base = b.base;
 			break;
@@ -63,10 +85,37 @@ void BaseConverter::updateValues()
 		return;
 
 	bool ok;
-	qint64 value = w->text().replace(" ", "").toLongLong(&ok, base);
-	for (Base b : bases)
+	m_value = w->text().replace(" ", "").toLongLong(&ok, base);
+	for (Base b : m_bases)
 		if (b.widget != w)
-			b.widget->setText(ok ? QString::number(value, b.base) : QString());
+			b.widget->setText(ok ? QString::number(m_value, b.base).toUpper() : QString());
+}
+
+void BaseConverter::setValue(quint64 value)
+{
+	m_value = value;
+	for (Base b : m_bases)
+		b.widget->setText(QString::number(value, b.base).toUpper());
+}
+
+void BaseConverter::onLittleEndianToggled()
+{
+	if (m_littleEndianButton->isChecked()) {
+		QSettings settings;
+		m_endian = Endian::Little;
+		settings.setValue(settingsEndianKey, "little");
+		setValue(EndianConverter::littleEndianToNumber(EndianConverter::bigEndianToBytes(m_value, calcValueByteCount(m_value))));
+	}
+}
+
+void BaseConverter::onBigEndianToggled()
+{
+	if (m_bigEndianButton->isChecked()) {
+		QSettings settings;
+		m_endian = Endian::Big;
+		settings.setValue(settingsEndianKey, "big");
+		setValue(EndianConverter::bigEndianToNumber(EndianConverter::littleEndianToBytes(m_value, calcValueByteCount(m_value))));
+	}
 }
 
 void BaseConverter::keyPressEvent(QKeyEvent *event)
@@ -75,4 +124,15 @@ void BaseConverter::keyPressEvent(QKeyEvent *event)
 		event->accept();
 		hide();
 	}
+}
+
+quint8 BaseConverter::calcValueByteCount(quint64 value)
+{
+	quint8 c = 0;
+	do {
+		value /= 0x100;
+		++c;
+	} while (value);
+
+	return c;
 }

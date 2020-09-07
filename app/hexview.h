@@ -7,6 +7,7 @@
 #include <optional>
 
 class HexViewInternal;
+class BufferedEditor;
 class QScrollBar;
 class QStatusBar;
 class QLabel;
@@ -22,6 +23,7 @@ public:
 public slots:
 	bool canUndo() const;
 	bool canRedo() const;
+	BufferedEditor *editor();
 
 	bool openFile(const QString &path);
 	bool saveChanges();

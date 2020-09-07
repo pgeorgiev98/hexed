@@ -1,6 +1,7 @@
 #include "hexview.h"
 #include "hexviewinternal.h"
 #include "bufferededitor.h"
+#include "endianconverter.h"
 #include "common.h"
 
 #include <QHBoxLayout>
@@ -19,7 +20,7 @@ HexView::HexView(QWidget *parent)
 	, m_fileSizeLabel(new QLabel)
 	, m_selectionLabel(new QLabel)
 {
-	m_statusBar->addPermanentWidget(m_selectionLabel);
+	m_statusBar->addPermanentWidget(m_selectionLabel, 1);
 	m_statusBar->addPermanentWidget(m_fileSizeLabel);
 
 	QHBoxLayout *hbox = new QHBoxLayout;
@@ -73,7 +74,7 @@ void HexView::updateStatusBar()
 {
 	// File size
 	qint64 fileSize = m_hexViewInternal->editor()->size();
-	QString fileSizeString;
+	QString fileSizeString = "Total: ";
 	fileSizeString.append(QString("%1B").arg(fileSize));
 	if (fileSize >= 1024)
 		fileSizeString.append(QString(" (%1)").arg(prettySize(fileSize)));
@@ -84,13 +85,32 @@ void HexView::updateStatusBar()
 	QString selectionText;
 	if (selection) {
 		ByteSelection sel = *selection;
-		if (sel.count == 1)
-			selectionText = QString("Selected 0x%1").arg(sel.begin, m_hexViewInternal->lineNumberDigitsCount(), 16, QChar('0'));
-		else if (sel.count > 1)
+
+		QByteArray bytes;
+		if (sel.count <= 4) {
+			auto editor = m_hexViewInternal->editor();
+			editor->seek(sel.begin);
+			for (int i = 0; i < sel.count; ++i)
+				bytes.append(quint8(*(editor->getByte().current)));
+		}
+
+		if (sel.count == 1) {
+
+			selectionText = QString("Selected 0x%1, Dec: %2")
+					.arg(sel.begin, m_hexViewInternal->lineNumberDigitsCount(), 16, QChar('0'))
+					.arg(quint64(quint8(bytes[0])));
+		} else if (sel.count > 1) {
 			selectionText = QString("Selected %1 bytes (0x%2 to 0x%3)")
 					.arg(sel.count)
 					.arg(sel.begin, m_hexViewInternal->lineNumberDigitsCount(), 16, QChar('0'))
 					.arg(sel.begin + sel.count - 1, m_hexViewInternal->lineNumberDigitsCount(), 16, QChar('0'));
+
+			if (!bytes.isEmpty()) {
+				quint64 le = EndianConverter::littleEndianToNumber(bytes);
+				quint64 be = EndianConverter::bigEndianToNumber(bytes);
+				selectionText.append(QString(", LE: %1, BE: %2").arg(le).arg(be));
+			}
+		}
 	}
 	m_selectionLabel->setText(selectionText);
 }
@@ -112,6 +132,11 @@ bool HexView::canUndo() const
 bool HexView::canRedo() const
 {
 	return m_hexViewInternal->canRedo();
+}
+
+BufferedEditor *HexView::editor()
+{
+	return m_hexViewInternal->editor();
 }
 
 bool HexView::openFile(const QString &path)
