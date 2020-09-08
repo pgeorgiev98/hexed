@@ -105,39 +105,25 @@ private:
 			: savedPosition(savedPosition), currentPosition(currentPosition), modificationCount(0) {}
 	};
 
-	struct Replacement
+	struct Modification
 	{
-		char before, after;
-		qint64 position;
+		enum class Type
+		{
+			Replace, Insert, Delete
+		};
 
-		Replacement() {}
-		Replacement(char before, char after, qint64 position)
-			: before(before), after(after), position(position) {}
-	};
-
-	struct Insertion
-	{
+		Type type;
 		char byte;
-		qint64 position;
+		int sectionIndex, byteIndex;
 
-		Insertion() {}
-		Insertion(char byte, qint64 position)
-			: byte(byte), position(position) {}
+		Modification(Type type, char byte, int sectionIndex, int byteIndex)
+			: type(type)
+			, byte(byte)
+			, sectionIndex(sectionIndex)
+			, byteIndex(byteIndex)
+		{
+		}
 	};
-
-	struct Deletion
-	{
-		char before;
-		qint64 position;
-
-		Deletion() {}
-		Deletion(char before, qint64 position)
-			: before(before), position(position) {}
-	};
-
-	// TODO: Add Deletion
-
-	typedef std::variant<Replacement, Insertion, Deletion> Modification;
 
 	QFileDevice *m_device;
 	QVector<Section> m_sections;
@@ -150,8 +136,10 @@ private:
 	int m_modificationCount;
 
 	int getSectionIndex(qint64 position);
-	void doModification(Modification modification);
-	void undoModification(Modification modification);
+	void doModification(Modification &modification);
+	void undoModification(Modification &modification);
+	void userDoModification(Modification m);
+	void updateSectionsPosition(int firstSectionIndex);
 };
 
 #endif // BUFFEREDEDITOR_H

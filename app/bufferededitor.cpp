@@ -90,65 +90,17 @@ BufferedEditor::Byte BufferedEditor::getByte()
 
 void BufferedEditor::replaceByte(char byte)
 {
-	Section &section = m_sections[m_sectionIndex];
-
-	bool couldRedo = canRedo();
-	if (couldRedo) {
-		m_modifications.remove(m_currentModificationIndex, m_modifications.size() - m_currentModificationIndex);
-		Q_ASSERT(!canRedo());
-	}
-
-	Modification m = Replacement(*section.data[m_sectionLocalPosition].current, byte, m_position);
-	doModification(m);
-	m_modifications.append(m);
-	m_currentModificationIndex = m_modifications.size();
-
-	Q_ASSERT(canUndo());
-	emit canUndoChanged(true);
-
-	if (couldRedo)
-		emit canRedoChanged(false);
+	userDoModification(Modification(Modification::Type::Replace, byte, m_sectionIndex, m_sectionLocalPosition));
 }
 
 void BufferedEditor::insertByte(char byte)
 {
-	bool couldRedo = canRedo();
-	if (couldRedo) {
-		m_modifications.remove(m_currentModificationIndex, m_modifications.size() - m_currentModificationIndex);
-		Q_ASSERT(!canRedo());
-	}
-
-	Modification m = Insertion(byte, m_position);
-	doModification(m);
-	m_modifications.append(m);
-	m_currentModificationIndex = m_modifications.size();
-
-	Q_ASSERT(canUndo());
-	emit canUndoChanged(true);
-
-	if (couldRedo)
-		emit canRedoChanged(false);
+	userDoModification(Modification(Modification::Type::Insert, byte, m_sectionIndex, m_sectionLocalPosition));
 }
 
 void BufferedEditor::deleteByte()
 {
-	bool couldRedo = canRedo();
-	if (couldRedo) {
-		m_modifications.remove(m_currentModificationIndex, m_modifications.size() - m_currentModificationIndex);
-		Q_ASSERT(!canRedo());
-	}
-
-	Section &section = m_sections[m_sectionIndex];
-	Modification m = Deletion(*section.data[m_sectionLocalPosition].current, m_position);
-	doModification(m);
-	m_modifications.append(m);
-	m_currentModificationIndex = m_modifications.size();
-
-	Q_ASSERT(canUndo());
-	emit canUndoChanged(true);
-
-	if (couldRedo)
-		emit canRedoChanged(false);
+	userDoModification(Modification(Modification::Type::Delete, char(0), m_sectionIndex, m_sectionLocalPosition));
 }
 
 bool BufferedEditor::writeChanges()
@@ -422,93 +374,139 @@ int BufferedEditor::getSectionIndex(qint64 position)
 		// Add the new section to the list of loaded sections
 		index = nextIndex == -1 ? m_sections.size() : nextIndex;
 		m_sections.insert(index, std::move(section));
+
+		// Update the undo events section indices
+		for (Modification &m : m_modifications)
+			if (m.sectionIndex >= index)
+				++m.sectionIndex;
 	}
 
 	return index;
 }
 
-void BufferedEditor::doModification(Modification modification)
+void BufferedEditor::doModification(Modification &modification)
 {
 	qint64 oldSize = m_size;
+	Section &section = m_sections[modification.sectionIndex];
 
-	if (std::holds_alternative<Replacement>(modification)) {
-		Replacement replacement = std::get<Replacement>(modification);
-		int sectionIndex = getSectionIndex(replacement.position);
-		if (sectionIndex == -1)
-			return;
-		Section &section = m_sections[sectionIndex];
-		int localPosition = int(replacement.position - section.currentPosition);
-		section.data[localPosition].current = replacement.after;
-		++section.modificationCount;
-
-	} else if (std::holds_alternative<Insertion>(modification)) {
-		Insertion insertion = std::get<Insertion>(modification);
-		if (insertion.position == m_size) {
-			// Insert at the end of the file
-			int sectionIndex = getSectionIndex(m_size - 1);
-			Q_ASSERT(sectionIndex != -1);
-			Section &section = m_sections[sectionIndex];
-			section.data.append(Byte(std::optional<char>(), insertion.byte));
-			++section.modificationCount;
-			++m_size;
-			m_position = m_size;
-		} else {
-			// TODO: partial implementation
-		}
-	} else if (std::holds_alternative<Deletion>(modification)) {
-		Deletion deletion = std::get<Deletion>(modification);
-		int sectionIndex = getSectionIndex(deletion.position);
-		Q_ASSERT(sectionIndex != -1);
-		Section &section = m_sections[sectionIndex];
-		int i = section.bytePosition(deletion.position);
-		Q_ASSERT(i != -1);
-		section.data[i].current.reset();
-		for (int i = sectionIndex + 1; i < m_sections.size(); ++i) {
-			--m_sections[i].currentPosition;
-			++m_sections[i].modificationCount;
-		}
-		++section.modificationCount;
-		--m_size;
+	switch (modification.type) {
+	case Modification::Type::Replace:
+	{
+		Byte &byte = section.data[modification.byteIndex];
+		char oldByte = *byte.current;
+		byte.current = modification.byte;
+		modification.byte = oldByte;
+		break;
 	}
 
-	++m_modificationCount;
+	case Modification::Type::Insert:
+	{
+		Byte byte(std::optional<char>(), modification.byte);
+		section.data.insert(modification.byteIndex, byte);
+		++m_size;
+		updateSectionsPosition(modification.sectionIndex + 1);
+		break;
+	}
+
+	case Modification::Type::Delete:
+	{
+		auto &byte = section.data[modification.byteIndex].current;
+		modification.byte = *byte;
+		byte.reset();
+		--m_size;
+		updateSectionsPosition(modification.sectionIndex + 1);
+		break;
+	}
+	}
+
 	if (m_size != oldSize)
 		emit sizeChanged(m_size);
+
+	++section.modificationCount;
+	++m_modificationCount;
 }
 
-void BufferedEditor::undoModification(Modification modification)
+void BufferedEditor::undoModification(Modification &modification)
 {
 	qint64 oldSize = m_size;
+	Section &section = m_sections[modification.sectionIndex];
 
-	if (std::holds_alternative<Replacement>(modification)) {
-		Replacement replacement = std::get<Replacement>(modification);
-		int sectionIndex = getSectionIndex(replacement.position);
-		if (sectionIndex == -1)
-			return;
-		Section &section = m_sections[sectionIndex];
-		int localPosition = int(replacement.position - section.currentPosition);
-		section.data[localPosition].current = replacement.before;
-		--section.modificationCount;
+	switch (modification.type) {
+	case Modification::Type::Replace:
+	{
+		Byte &byte = section.data[modification.byteIndex];
+		char oldByte = *byte.current;
+		byte.current = modification.byte;
+		modification.byte = oldByte;
+		break;
+	}
 
-	} else if (std::holds_alternative<Insertion>(modification)) {
-		Insertion insertion = std::get<Insertion>(modification);
-		if (insertion.position == m_size - 1) {
-			// Remove the last byte
-			int sectionIndex = getSectionIndex(m_size - 1);
-			Q_ASSERT(sectionIndex != -1);
-			Section &section = m_sections[sectionIndex];
-			section.data.removeLast();
-			--section.modificationCount;
-			--m_size;
-			m_position = m_size;
-		} else {
-			// TODO: partial implementation
-		}
-	} else if (std::holds_alternative<Deletion>(modification)) {
-		// TODO
+	case Modification::Type::Insert:
+	{
+		Q_ASSERT(!section.data[modification.byteIndex].saved);
+		section.data.removeAt(modification.byteIndex);
+		--m_size;
+		updateSectionsPosition(modification.sectionIndex + 1);
+		break;
+	}
+
+	case Modification::Type::Delete:
+	{
+		std::optional<char> &byte = section.data[modification.byteIndex].current;
+		Q_ASSERT(!byte);
+		byte = modification.byte;
+		++m_size;
+		updateSectionsPosition(modification.sectionIndex + 1);
+		break;
+	}
 	}
 
 	--m_modificationCount;
 	if (m_size != oldSize)
 		emit sizeChanged(m_size);
+}
+
+void BufferedEditor::userDoModification(Modification m)
+{
+	bool couldRedo = canRedo();
+	if (couldRedo) {
+		m_modifications.remove(m_currentModificationIndex, m_modifications.size() - m_currentModificationIndex);
+		Q_ASSERT(!canRedo());
+	}
+
+	doModification(m);
+	m_modifications.append(m);
+	m_currentModificationIndex = m_modifications.size();
+
+	Q_ASSERT(canUndo());
+	emit canUndoChanged(true);
+
+	if (couldRedo)
+		emit canRedoChanged(false);
+}
+
+void BufferedEditor::updateSectionsPosition(int firstSectionIndex)
+{
+	qint64 savedPosition;
+	qint64 currentPosition;
+	if (firstSectionIndex > 0) {
+		Section &s = m_sections[firstSectionIndex - 1];
+		savedPosition = s.savedPosition;
+		currentPosition = s.currentPosition;
+		savedPosition += s.savedLength();
+		currentPosition += s.currentLength();
+	} else {
+		savedPosition = 0;
+		currentPosition = 0;
+	}
+
+	for (int i = firstSectionIndex; i < m_sections.size(); ++i) {
+		Section &s = m_sections[i];
+		qint64 offset = s.savedPosition - savedPosition;
+		savedPosition += offset;
+		currentPosition += offset;
+		s.currentPosition = currentPosition;
+		savedPosition += s.savedLength();
+		currentPosition += s.currentLength();
+	}
 }
