@@ -161,23 +161,41 @@ bool BufferedEditor::writeChanges()
 		currentPosition += section.currentLength();
 	}
 
-	// Sort them is such manner that the first sections in the list
-	// should be written first to the disk
-	std::stable_sort(unchangedSections.begin(), unchangedSections.end(),
-		  // 'Less than' function, sorting is ascending
-		  [](const UnchangedSection &s1, const UnchangedSection &s2) -> bool {
-		// Return true when s1.old and s2.new are intersecting
-		// i.e. when s2 will be written over s1's space
-		return s2.newPosition < s1.oldPosition + s1.length &&
-				s2.newPosition + s2.length > s1.oldPosition;
-	});
-
 	qDebug() << unchangedSections.size() << "unchanged sections have to be moved";
+
+	// Sort the sections in the order that they have to be written to the disk
+	QVector<UnchangedSection> sortedUnchangedSections;
+	while (!unchangedSections.isEmpty()) {
+		// Find a section s1 that won't be written over another section
+		int attemptCount = 0;
+		int j = 0;
+		UnchangedSection s1 = unchangedSections[j];
+		for (int i = 0; i < unchangedSections.size(); ++i) {
+			if (i != j) {
+				UnchangedSection s2 = unchangedSections[i];
+				// If s1 will be written over s2
+				if (s1.newPosition < s2.oldPosition + s2.length &&
+						s1.newPosition + s1.length > s2.oldPosition) {
+					// Restart the search
+					s1 = s2;
+					j = i;
+					i = 0;
+					++attemptCount;
+					Q_ASSERT(attemptCount <= unchangedSections.size());
+					if (attemptCount > unchangedSections.size())
+						return false;
+				}
+			}
+		}
+		unchangedSections.removeAt(j);
+		sortedUnchangedSections.append(s1);
+	}
+
 	// Move those sections
-	for (int i = 0; i < unchangedSections.size(); ++i) {
-		UnchangedSection s = unchangedSections[i];
+	for (int i = 0; i < sortedUnchangedSections.size(); ++i) {
+		UnchangedSection s = sortedUnchangedSections[i];
 		qDebug("Moving section %d/%d with a length of %d from %lld to %lld",
-			   i, unchangedSections.size() - 1,
+			   i, sortedUnchangedSections.size() - 1,
 			   s.length, s.oldPosition, s.newPosition);
 
 		QVector<char> buffer(int(s.length));
