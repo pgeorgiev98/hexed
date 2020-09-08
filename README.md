@@ -9,10 +9,10 @@ An open-source, cross-platform binary file hex editor written in C++ with Qt5.
 - [x] Loads only the parts of the file that are needed in memory
 - [x] Can have many files open at once in tabs
 - [x] Can replace bytes and append bytes to the file
-- [ ] Can insert bytes at any position in the file
+- [x] Can insert bytes at any position in the file
 - [x] Can delete bytes at any position in the file
 - [x] Supports both hex and ascii keyboard input
-- [ ] Can search the file
+- [x] Can search the file
 - [x] Has undo and redo functionality
 - [ ] Can compare binary files side by side
 
@@ -46,4 +46,3 @@ You've been warned.
 After compiling you can install it by running
 
 	sudo make install
-
