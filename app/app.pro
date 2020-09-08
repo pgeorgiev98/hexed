@@ -19,6 +19,7 @@ CONFIG += c++17
 SOURCES += \
         baseconverter.cpp \
         bufferededitor.cpp \
+        byteinputwidget.cpp \
         common.cpp \
         endianconverter.cpp \
         expressionvalidator.cpp \
@@ -34,6 +35,7 @@ SOURCES += \
 HEADERS += \
         baseconverter.h \
         bufferededitor.h \
+        byteinputwidget.h \
         common.h \
         endianconverter.h \
         expressionvalidator.h \

@@ -2,6 +2,7 @@
 #include "bufferededitor.h"
 #include "gotodialog.h"
 #include "findwidget.h"
+#include "byteinputwidget.h"
 
 #include <QPainter>
 #include <QPaintEvent>
@@ -19,6 +20,11 @@
 #include <QScrollBar>
 #include <QtMath>
 #include <QMessageBox>
+#include <QVBoxLayout>
+#include <QHBoxLayout>
+#include <QSpinBox>
+#include <QPushButton>
+#include <QLabel>
 
 static QColor backgroundColor("#ffffff");
 static QColor alternateBackgroundColor("#aaaaaa");
@@ -33,6 +39,53 @@ static QColor selectedTextColor("#000000");
 
 static const char hexTable[16] = {'0', '1', '2', '3', '4', '5', '6', '7',
 								  '8', '9', 'A', 'B', 'C', 'D', 'E', 'F'};
+
+static bool runGetNumberOfBytesToInsertDialog(QWidget *widget, int &countOut, quint8 &valueOut)
+{
+	QDialog dialog(widget);
+	QVBoxLayout *layout = new QVBoxLayout;
+	dialog.setLayout(layout);
+
+	QSpinBox *count = new QSpinBox;
+	ByteInputWidget *value = new ByteInputWidget;
+	count->setRange(1, 1000000000);
+	QPushButton *ok = new QPushButton("Ok");
+	QPushButton *cancel = new QPushButton("Cancel");
+
+	{
+		QHBoxLayout *hbox = new QHBoxLayout;
+		layout->addLayout(hbox);
+		hbox->addWidget(new QLabel("Insert "));
+		hbox->addWidget(count);
+		hbox->addWidget(new QLabel(" bytes"));
+	}
+
+	layout->addWidget(new QLabel("With value:"));
+	layout->addWidget(value);
+
+	{
+		QHBoxLayout *hbox = new QHBoxLayout;
+		layout->addLayout(hbox);
+		hbox->addWidget(ok);
+		hbox->addWidget(cancel);
+	}
+
+	ok->setEnabled(value->inputValid());
+	QObject::connect(value, &ByteInputWidget::validityChanged, [&]() {
+		ok->setEnabled(value->inputValid());
+	});
+	QObject::connect(ok, &QPushButton::clicked, &dialog, &QDialog::accept);
+	QObject::connect(cancel, &QPushButton::clicked, &dialog, &QDialog::reject);
+
+	count->selectAll();
+	if (dialog.exec()) {
+		countOut = count->value();
+		valueOut = value->get();
+		return true;
+	} else {
+		return false;
+	}
+}
 
 HexViewInternal::HexViewInternal(QWidget *parent)
 	: QWidget(parent)
@@ -551,12 +604,17 @@ void HexViewInternal::mousePressEvent(QMouseEvent *event)
 		QAction copyHexAction("Copy hex");
 		QAction selectAllAction("Select All");
 		QAction selectNoneAction("Select None");
+		QAction insertBeforeAction("Insert Before");
+		QAction insertAfterAction("Insert After");
 
 		menu.addAction(&copyTextAction);
 		menu.addAction(&copyHexAction);
 		menu.addSeparator();
 		menu.addAction(&selectAllAction);
 		menu.addAction(&selectNoneAction);
+		menu.addSeparator();
+		menu.addAction(&insertBeforeAction);
+		menu.addAction(&insertAfterAction);
 
 		menu.popup(event->globalPos());
 
@@ -565,6 +623,8 @@ void HexViewInternal::mousePressEvent(QMouseEvent *event)
 		copyHexAction.setEnabled(hasSelection);
 		selectAllAction.setEnabled(!m_editor->isEmpty() && type);
 		selectNoneAction.setEnabled(hasSelection);
+		insertBeforeAction.setEnabled(hasSelection);
+		insertAfterAction.setEnabled(hasSelection && begin != m_editor->size());
 
 		QAction *a = menu.exec();
 
@@ -576,6 +636,22 @@ void HexViewInternal::mousePressEvent(QMouseEvent *event)
 			selectAll();
 		} else if (a == &selectNoneAction) {
 			selectNone();
+		} else if (a == &insertBeforeAction) {
+			int count;
+			quint8 value;
+			if (runGetNumberOfBytesToInsertDialog(this, count, value)) {
+				m_editor->seek(begin);
+				for (int i = 0; i < count; ++i)
+					m_editor->insertByte(value);
+			}
+		} else if (a == &insertAfterAction) {
+			int count;
+			quint8 value;
+			if (runGetNumberOfBytesToInsertDialog(this, count, value)) {
+				m_editor->seek(begin + count);
+				for (int i = 0; i < count; ++i)
+					m_editor->insertByte(value);
+			}
 		}
 	} else {
 		m_selection.reset();
