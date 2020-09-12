@@ -2,6 +2,7 @@
 #define HEXVIEWINTERNAL_H
 
 #include "common.h"
+#include "bufferededitor.h"
 
 #include <QWidget>
 #include <QString>
@@ -13,7 +14,6 @@
 
 #include <optional>
 
-class BufferedEditor;
 class GotoDialog;
 class FindWidget;
 
@@ -25,6 +25,10 @@ class HexViewInternal : public QWidget
 private:
 	friend class HexView;
 	friend class FindWidget;
+
+	enum class Mode {
+		Normal, Diff,
+	};
 
 	explicit HexViewInternal(QWidget *parent = nullptr);
 
@@ -38,6 +42,9 @@ private:
 	bool canUndo() const;
 	bool canRedo() const;
 	bool cursorIsInFindWidget(QPoint cursorPos) const;
+
+	void setMode(Mode mode);
+	void setDiffGroup(QVector<HexViewInternal *> hexViews);
 
 signals:
 	void canUndoChanged(bool canUndo);
@@ -80,6 +87,8 @@ protected:
 	void keyPressEvent(QKeyEvent *) override;
 
 private:
+	Mode m_mode;
+
 	QFont m_font;
 	QFontMetrics m_fontMetrics;
 	int m_characterWidth;
@@ -101,10 +110,14 @@ private:
 	GotoDialog *m_gotoDialog;
 	FindWidget *m_findWidget;
 
+	QVector<BufferedEditor::Byte> m_visiblePage;
+	QVector<HexViewInternal *> m_diffGroup;
+
 	qint64 getHoverCell(const QPoint &mousePos) const;
 	qint64 getHoverText(const QPoint &mousePos) const;
 	int lineNumberDigitsCount() const;
 	int lineNumberWidth() const;
+	void updateVisiblePage();
 };
 
 #endif // HEXVIEWINTERNAL_H

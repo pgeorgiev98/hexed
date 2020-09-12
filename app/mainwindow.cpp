@@ -102,6 +102,24 @@ bool MainWindow::openFile(const QString &path)
 	return ok;
 }
 
+bool MainWindow::diffFiles(const QStringList &files)
+{
+	HexView *tab = new HexView;
+
+	bool ok = true;
+	for (const QString &file : files)
+		ok &= tab->openFile(file);
+
+	if (ok) {
+		m_tabWidget->insertTab(m_tabWidget->count(), tab, files.join(" | "));
+		m_tabWidget->setCurrentWidget(tab);
+	} else {
+		// TODO: proper cleanup
+	}
+
+	return ok;
+}
+
 void MainWindow::onOpenClicked()
 {
 	// TODO: Remember the last opened directory

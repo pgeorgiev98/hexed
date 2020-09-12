@@ -4,10 +4,14 @@
 #include "common.h"
 
 #include <QWidget>
+#include <QVector>
+
 #include <optional>
 
 class HexViewInternal;
 class BufferedEditor;
+
+class QHBoxLayout;
 class QScrollBar;
 class QStatusBar;
 class QLabel;
@@ -47,11 +51,14 @@ private slots:
 	void setTopRow(qint64 topRow);
 	void onScrollBarChanged(int value);
 	void updateStatusBar();
+	void onUserChangedSelection();
 
 	int scrollStep(qint64 rowCount) const;
+	qint64 scrollMaximum() const;
 
 private:
-	HexViewInternal *m_hexViewInternal;
+	QVector<HexViewInternal *> m_hexViews;
+	QHBoxLayout *m_hexViewsLayout;
 	QScrollBar *m_verticalScrollBar;
 	QStatusBar *m_statusBar;
 	QLabel *m_fileSizeLabel;

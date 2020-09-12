@@ -9,6 +9,7 @@ static void printUsage(const QStringList &args, QTextStream &out)
 }
 
 static QTextStream out(stdout);
+static QTextStream err(stderr);
 
 int main(int argc, char *argv[])
 {
@@ -22,8 +23,19 @@ int main(int argc, char *argv[])
 	}
 
 	MainWindow w;
-	for (int i = 1; i < a.arguments().size(); ++i)
-		w.openFile(a.arguments()[i]);
+	if (a.arguments()[1] == "--diff") {
+		if (a.arguments().size() == 2) {
+			printUsage(a.arguments(), err);
+			return 1;
+		}
+		QStringList files;
+		for (int i = 2; i < a.arguments().size(); ++i)
+			files << a.arguments()[i];
+		w.diffFiles(files);
+	} else {
+		for (int i = 1; i < a.arguments().size(); ++i)
+			w.openFile(a.arguments()[i]);
+	}
 	w.show();
 
 	return a.exec();

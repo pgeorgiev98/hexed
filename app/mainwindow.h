@@ -17,6 +17,7 @@ public:
 
 public slots:
 	bool openFile(const QString &path);
+	bool diffFiles(const QStringList &files);
 
 	void onOpenClicked();
 	bool saveChanges();

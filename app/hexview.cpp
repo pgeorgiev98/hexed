@@ -14,7 +14,7 @@
 
 HexView::HexView(QWidget *parent)
 	: QWidget(parent)
-	, m_hexViewInternal(new HexViewInternal)
+	, m_hexViewsLayout(new QHBoxLayout)
 	, m_verticalScrollBar(new QScrollBar)
 	, m_statusBar(new QStatusBar)
 	, m_fileSizeLabel(new QLabel)
@@ -25,7 +25,7 @@ HexView::HexView(QWidget *parent)
 
 	QHBoxLayout *hbox = new QHBoxLayout;
 	hbox->setContentsMargins(0, 0, 0, 0);
-	hbox->addWidget(m_hexViewInternal);
+	hbox->addLayout(m_hexViewsLayout);
 	hbox->addWidget(m_verticalScrollBar, 0, Qt::AlignRight);
 
 	QVBoxLayout *vbox = new QVBoxLayout;
@@ -35,43 +35,41 @@ HexView::HexView(QWidget *parent)
 
 	setLayout(vbox);
 
-	connect(m_hexViewInternal, &HexViewInternal::canUndoChanged, this, &HexView::canUndoChanged);
-	connect(m_hexViewInternal, &HexViewInternal::canRedoChanged, this, &HexView::canRedoChanged);
-	connect(m_hexViewInternal, &HexViewInternal::rowCountChanged, this, &HexView::updateScrollMaximum);
-	connect(m_hexViewInternal, &HexViewInternal::topRowChanged, this, &HexView::setTopRow);
-	connect(m_hexViewInternal, &HexViewInternal::scrollMaximumChanged, this, &HexView::updateScrollMaximum);
-	connect(m_hexViewInternal, &HexViewInternal::selectionChanged, this, &HexView::selectionChanged);
 	connect(m_verticalScrollBar, &QScrollBar::valueChanged, this, &HexView::onScrollBarChanged);
 }
 
 std::optional<ByteSelection> HexView::selection() const
 {
-	return m_hexViewInternal->selection();
+	// TODO
+	return std::optional<ByteSelection>();
+	//return m_hexViewInternal->selection();
 }
 
 void HexView::updateScrollMaximum()
 {
-	qint64 scrollMaximum = m_hexViewInternal->scrollMaximum();
-	m_verticalScrollBar->setMaximum(scrollMaximum / scrollStep(scrollMaximum) + 1);
+	qint64 scrollMax = scrollMaximum();
+	m_verticalScrollBar->setMaximum(scrollMax / scrollStep(scrollMax) + 1);
 }
 
 void HexView::setTopRow(qint64 topRow)
 {
-	qint64 scrollMaximum = m_hexViewInternal->scrollMaximum();
-	m_verticalScrollBar->setValue(topRow / scrollStep(scrollMaximum));
+	m_verticalScrollBar->setValue(topRow / scrollStep(scrollMaximum()));
 }
 
 void HexView::onScrollBarChanged(int value)
 {
-	qint64 scrollMaximum = m_hexViewInternal->scrollMaximum();
-	qint64 topRow = qint64(value) * scrollStep(scrollMaximum);
-	if (topRow > scrollMaximum)
-		topRow = scrollMaximum;
-	m_hexViewInternal->setTopRow(topRow);
+	qint64 scrollMax = scrollMaximum();
+	qint64 topRow = qint64(value) * scrollStep(scrollMax);
+	if (topRow > scrollMax)
+		topRow = scrollMax;
+	for (auto h : m_hexViews)
+		h->setTopRow(topRow);
 }
 
 void HexView::updateStatusBar()
 {
+	// TODO
+	/*
 	// File size
 	qint64 fileSize = m_hexViewInternal->editor()->size();
 	QString fileSizeString = "Total: ";
@@ -118,6 +116,24 @@ void HexView::updateStatusBar()
 		}
 	}
 	m_selectionLabel->setText(selectionText);
+	*/
+}
+
+void HexView::onUserChangedSelection()
+{
+	// TODO: Test different sizes
+	// TODO: And selectAll
+	HexViewInternal *hexView = qobject_cast<HexViewInternal *>(sender());
+	Q_ASSERT(hexView);
+	auto selection = hexView->selection();
+	for (auto h : m_hexViews) {
+		if (h != hexView) {
+			if (selection)
+				h->highlight(*selection);
+			else
+				h->selectNone();
+		}
+	}
 }
 
 int HexView::scrollStep(qint64 rowCount) const
@@ -128,82 +144,129 @@ int HexView::scrollStep(qint64 rowCount) const
 	return qMax(step, 1);
 }
 
+qint64 HexView::scrollMaximum() const
+{
+	qint64 scrollMaximum = 0;
+	for (auto h : m_hexViews)
+		scrollMaximum = qMax(scrollMaximum, h->scrollMaximum());
+	return scrollMaximum;
+}
+
 
 bool HexView::canUndo() const
 {
-	return m_hexViewInternal->canUndo();
+	// TODO
+	//return m_hexViewInternal->canUndo();
+	return false;
 }
 
 bool HexView::canRedo() const
 {
-	return m_hexViewInternal->canRedo();
+	// TODO
+	//return m_hexViewInternal->canRedo();
+	return false;
 }
 
 BufferedEditor *HexView::editor()
 {
-	return m_hexViewInternal->editor();
+	// TODO
+	//return m_hexViewInternal->editor();
+	return nullptr;
 }
 
 bool HexView::openFile(const QString &path)
 {
-	bool result = m_hexViewInternal->openFile(path);
-	BufferedEditor *editor = m_hexViewInternal->editor();
-	connect(editor, &BufferedEditor::sizeChanged, this, &HexView::updateStatusBar);
-	connect(m_hexViewInternal, &HexViewInternal::selectionChanged, this, &HexView::updateStatusBar);
-	updateStatusBar();
+	HexViewInternal *hexView = new HexViewInternal;
+	bool result = hexView->openFile(path);
+
+	if (result) {
+		m_hexViewsLayout->addWidget(hexView);
+		m_hexViews.append(hexView);
+		for (auto h : m_hexViews)
+			h->setDiffGroup(m_hexViews);
+
+		BufferedEditor *editor = hexView->editor();
+		connect(editor, &BufferedEditor::sizeChanged, this, &HexView::updateStatusBar);
+		connect(hexView, &HexViewInternal::selectionChanged, this, &HexView::updateStatusBar);
+		connect(hexView, &HexViewInternal::canUndoChanged, this, &HexView::canUndoChanged);
+		connect(hexView, &HexViewInternal::canRedoChanged, this, &HexView::canRedoChanged);
+		connect(hexView, &HexViewInternal::rowCountChanged, this, &HexView::updateScrollMaximum);
+		connect(hexView, &HexViewInternal::topRowChanged, this, &HexView::setTopRow);
+		connect(hexView, &HexViewInternal::scrollMaximumChanged, this, &HexView::updateScrollMaximum);
+		connect(hexView, &HexViewInternal::selectionChanged, this, &HexView::selectionChanged); // TODO: Deduplicate
+		connect(hexView, &HexViewInternal::userChangedSelection, this, &HexView::onUserChangedSelection);
+		updateStatusBar();
+	} else {
+		hexView->deleteLater();
+	}
+
 	return result;
 }
 
 bool HexView::saveChanges()
 {
-	return m_hexViewInternal->saveChanges();
+	// TODO
+	return false;
+	//return m_hexViewInternal->saveChanges();
 }
 
 bool HexView::quit()
 {
-	return m_hexViewInternal->quit();
+	// TODO
+	bool ok = true;
+	for (auto h : m_hexViews)
+		ok &= h->quit();
+	return ok;
 }
 
 void HexView::undo()
 {
-	m_hexViewInternal->undo();
+	// TODO
+	//m_hexViewInternal->undo();
 }
 
 void HexView::redo()
 {
-	m_hexViewInternal->redo();
+	// TODO
+	//m_hexViewInternal->redo();
 }
 
 void HexView::selectAll()
 {
-	m_hexViewInternal->selectAll();
+	// TODO
+	//m_hexViewInternal->selectAll();
 }
 
 void HexView::selectNone()
 {
-	m_hexViewInternal->selectNone();
+	// TODO
+	//m_hexViewInternal->selectNone();
 }
 
 void HexView::copyText()
 {
-	ByteSelection selection = *m_hexViewInternal->selection();
-	selection.type = ByteSelection::Type::Text;
-	m_hexViewInternal->copy(selection);
+	// TODO
+	//ByteSelection selection = *m_hexViewInternal->selection();
+	//selection.type = ByteSelection::Type::Text;
+	//m_hexViewInternal->copy(selection);
 }
 
 void HexView::copyHex()
 {
-	ByteSelection selection = *m_hexViewInternal->selection();
-	selection.type = ByteSelection::Type::Cells;
-	m_hexViewInternal->copy(selection);
+	// TODO
+	//ByteSelection selection = *m_hexViewInternal->selection();
+	//selection.type = ByteSelection::Type::Cells;
+	//m_hexViewInternal->copy(selection);
 }
 
 void HexView::openGotoDialog()
 {
-	m_hexViewInternal->openGotoDialog();
+	// TODO
+	//m_hexViewInternal->openGotoDialog();
 }
 
 void HexView::openFindDialog()
 {
-	m_hexViewInternal->openFindDialog();
+	// TODO
+	//m_hexViewInternal->openFindDialog();
 }

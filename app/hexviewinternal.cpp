@@ -1,5 +1,4 @@
 #include "hexviewinternal.h"
-#include "bufferededitor.h"
 #include "gotodialog.h"
 #include "findwidget.h"
 #include "byteinputwidget.h"
@@ -89,6 +88,7 @@ static bool runGetNumberOfBytesToInsertDialog(QWidget *widget, int &countOut, qu
 
 HexViewInternal::HexViewInternal(QWidget *parent)
 	: QWidget(parent)
+	, m_mode(Mode::Normal)
 	, m_font(QFontDatabase::systemFont(QFontDatabase::SystemFont::FixedFont))
 	, m_fontMetrics(m_font)
 #if QT_VERSION >= 0x050B00
@@ -211,6 +211,17 @@ bool HexViewInternal::cursorIsInFindWidget(QPoint cursorPos) const
 	return false;
 }
 
+void HexViewInternal::setMode(Mode mode)
+{
+	m_mode = mode;
+	update();
+}
+
+void HexViewInternal::setDiffGroup(QVector<HexViewInternal *> hexViews)
+{
+	m_diffGroup = hexViews;
+}
+
 void HexViewInternal::setBytesPerLine(int bytesPerLine)
 {
 	/*
@@ -314,6 +325,7 @@ void HexViewInternal::setTopRow(qint64 topRow)
 {
 	topRow = qBound(qint64(0), topRow, rowCount());
 	m_topRow = topRow;
+	updateVisiblePage();
 	emit topRowChanged(topRow);
 
 	update();
@@ -418,6 +430,7 @@ void HexViewInternal::updateFindDialogPosition()
 
 void HexViewInternal::paintEvent(QPaintEvent *event)
 {
+	// TODO: Something with m_mode
 	QPainter painter(this);
 
 	painter.setFont(m_font);
@@ -442,11 +455,10 @@ void HexViewInternal::paintEvent(QPaintEvent *event)
 	qint64 i = startY * m_bytesPerLine;
 	if (i >= m_editor->size())
 		return;
-	m_editor->seek(i);
 	for (qint64 y = startY, yCoord = m_cellSize; i <= m_editor->size() && y < endY; ++y, yCoord += cellHeight) {
 
 		bool rowIsHovered = m_hoveredIndex == -1 ? false : m_hoveredIndex / 16 == y;
-		qint64 rowDisplayAddress = rowIsHovered ? m_hoveredIndex : m_editor->position();
+		qint64 rowDisplayAddress = rowIsHovered ? m_hoveredIndex : i;
 
 		painter.setPen(rowIsHovered ? textColor : alternateBackgroundColor);
 		painter.setBrush(y % 2 == 0 ? backgroundColor : alternateBackgroundColor);
@@ -493,12 +505,25 @@ void HexViewInternal::paintEvent(QPaintEvent *event)
 			}
 
 			bool editingLast = m_editingCell && selectionStart == m_editor->size();
-			if (!m_editor->atEnd() || editingLast) {
+			if (i < m_editor->size() || editingLast) {
 				bool isModified = false;
 				unsigned char byte;
-				if (!m_editor->atEnd()) {
-					BufferedEditor::Byte b = m_editor->getByte();
-					isModified = b.saved != b.current;
+				if (i < m_editor->size()) {
+					int visiblePageIndex = i - startY * m_bytesPerLine;
+					BufferedEditor::Byte b = m_visiblePage[visiblePageIndex];
+					if (m_diffGroup.size() <= 1) {
+						isModified = b.saved != b.current;
+					} else {
+						for (auto hexView : m_diffGroup) {
+							if (hexView != this) {
+								if (visiblePageIndex >= hexView->m_visiblePage.size() ||
+										m_visiblePage[visiblePageIndex].current != hexView->m_visiblePage[visiblePageIndex].current) {
+									isModified = true;
+									break;
+								}
+							}
+						}
+					}
 					byte = static_cast<unsigned char>(*b.current);
 					cellText[0] = hexTable[(byte >> 4) & 0xF];
 					cellText[1] = hexTable[(byte >> 0) & 0xF];
@@ -535,6 +560,7 @@ void HexViewInternal::resizeEvent(QResizeEvent *)
 {
 	emit scrollMaximumChanged();
 	updateFindDialogPosition();
+	updateVisiblePage();
 }
 
 void HexViewInternal::mouseMoveEvent(QMouseEvent *event)
@@ -569,6 +595,7 @@ void HexViewInternal::mouseMoveEvent(QMouseEvent *event)
 			++count;
 
 		setSelection(ByteSelection(begin, count, m_selection->type));
+		emit userChangedSelection();
 	} else {
 		m_hoveredIndex = hoverCellIndex != -1 ? hoverCellIndex : hoverTextIndex;
 	}
@@ -663,6 +690,7 @@ void HexViewInternal::mousePressEvent(QMouseEvent *event)
 		else
 			emit selectionChanged();
 		m_selecting = m_selection.has_value();
+		emit userChangedSelection();
 		update();
 	}
 }
@@ -920,4 +948,23 @@ int HexViewInternal::lineNumberDigitsCount() const
 int HexViewInternal::lineNumberWidth() const
 {
 	return m_cellSize + lineNumberDigitsCount() * m_characterWidth;
+}
+
+void HexViewInternal::updateVisiblePage()
+{
+	const int cellHeight = m_cellSize + m_cellPadding;
+	const int windowHeight = height();
+
+	const qint64 startByte = m_topRow * m_bytesPerLine;
+	const int visibleRows = windowHeight / cellHeight + (windowHeight % cellHeight != 0);
+
+	if (startByte >= m_editor->size())
+		return;
+
+	const int totalBytes = qMin(qint64(m_bytesPerLine * visibleRows), m_editor->size() - startByte);
+	m_visiblePage.resize(totalBytes);
+
+	m_editor->seek(startByte);
+	for (int i = 0; i < totalBytes; ++i)
+		m_visiblePage[i] = m_editor->getByte();
 }
