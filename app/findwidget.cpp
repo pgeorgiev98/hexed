@@ -12,6 +12,8 @@
 #include <QKeyEvent>
 #include <QRegExpValidator>
 #include <QFontMetrics>
+#include <QRandomGenerator>
+#include <QDateTime>
 
 static int textWidth(QFontMetrics fm, const QString &text)
 {
@@ -78,7 +80,7 @@ void FindWidget::close()
 QByteArray FindWidget::searchData() const
 {
 	QByteArray arr;
-	for (const QString &s : m_input->text().split(' ', QString::SkipEmptyParts))
+	for (const QString &s : m_input->text().split(' ', Qt::SkipEmptyParts))
 		arr.append(s.toInt(nullptr, 16));
 	return arr;
 }
@@ -100,9 +102,10 @@ void FindWidget::focusInEvent(QFocusEvent *)
 
 void FindWidget::showEvent(QShowEvent *)
 {
+	QRandomGenerator gen(QDateTime::currentDateTime().toMSecsSinceEpoch());
 	QString placeholder;
 	for (int i = 0; i < 5; ++i)
-		placeholder.append(QString("%1 ").arg(qrand() % 256, 2, 16, QChar('0')));
+		placeholder.append(QString("%1 ").arg(gen.generate() % 256, 2, 16, QChar('0')));
 	placeholder.append("...");
 	m_input->setPlaceholderText(placeholder);
 }

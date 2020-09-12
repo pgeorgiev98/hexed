@@ -1,19 +1,17 @@
 #include "mainwindow.h"
 #include <QApplication>
 #include <QTextStream>
-#include <QDateTime>
-
-static void printUsage(const QStringList &args, QTextStream &out)
-{
-	out << "Usage: " << args[0] << " filename" << endl;
-}
 
 static QTextStream out(stdout);
 static QTextStream err(stderr);
 
+static void printUsage(const QStringList &args, QTextStream &out)
+{
+	out << "Usage: " << args[0] << " filename" << Qt::endl;
+}
+
 int main(int argc, char *argv[])
 {
-	qsrand(QDateTime::currentDateTime().toMSecsSinceEpoch());
 	QApplication a(argc, argv);
 
 	const auto &args = a.arguments();
