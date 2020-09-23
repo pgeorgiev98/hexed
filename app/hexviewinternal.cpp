@@ -32,6 +32,8 @@ static QColor hoverTextColor("#ff0000");
 static QColor modifiedTextColor("#ff0000");
 static QColor selectedColor("#0000ff");
 static QColor selectedTextColor("#000000");
+static QColor greySelectionColor("#333333");
+static QColor greySelectionTextColor("#ffffff");
 
 #define cellX(x) (lineNumberWidth() + (x) * m_cellSize + ((x) + 1 + ((x) / 8)) * m_cellPadding)
 #define textX(x) (cellX(m_bytesPerLine + 1) + x * (m_characterWidth + 5))
@@ -118,6 +120,12 @@ HexViewInternal::HexViewInternal(QWidget *parent)
 	hoverTextColor = pal.link().color();
 	selectedColor = pal.highlight().color();
 	selectedTextColor = pal.highlightedText().color();
+	greySelectionColor.setRgbF(
+				selectedColor.redF()   * 0.3 + backgroundColor.redF()   * 0.7,
+				selectedColor.greenF() * 0.3 + backgroundColor.greenF() * 0.7,
+				selectedColor.blueF()  * 0.3 + backgroundColor.blueF()  * 0.7
+				);
+	greySelectionTextColor = selectedTextColor;
 
 	pal.setColor(QPalette::Window, backgroundColor);
 	setAutoFillBackground(true);
@@ -391,12 +399,14 @@ bool HexViewInternal::quit()
 void HexViewInternal::undo()
 {
 	m_editor->undo();
+	updateVisiblePage();
 	update();
 }
 
 void HexViewInternal::redo()
 {
 	m_editor->redo();
+	updateVisiblePage();
 	update();
 }
 
@@ -480,19 +490,26 @@ void HexViewInternal::paintEvent(QPaintEvent *event)
 			bool inSelection = (i >= selectionStart && i < selectionEnd);
 
 			if (i == m_hoveredIndex || inSelection) {
-				if (inSelection)
-					painter.setBrush(selectedColor);
-				else
+				if (inSelection) {
+					painter.setBrush(selection()->type == ByteSelection::Type::Text && hasFocus() ? selectedColor : greySelectionColor);
+					painter.setPen(painter.brush().color());
+				} else {
 					painter.setBrush(backgroundColor);
+				}
 				if (i == m_hoveredIndex)
 					painter.setPen(hoverTextColor);
-				else
-					painter.setPen(selectedColor);
 
 				painter.drawRect(textCoord.x() - 2,
 								 textCoord.y() - m_fontMetrics.ascent() - 2,
 								 m_characterWidth + 4,
 								 m_fontMetrics.height() + 4);
+
+				if (inSelection) {
+					painter.setBrush(selection()->type == ByteSelection::Type::Cells && hasFocus() ? selectedColor : greySelectionColor);
+					painter.setPen(painter.brush().color());
+				}
+				if (i == m_hoveredIndex)
+					painter.setPen(hoverTextColor);
 
 				if (m_editingCell && i >= selectionStart && i <= selectionEnd) {
 					painter.setPen(textColor);
@@ -670,6 +687,8 @@ void HexViewInternal::mousePressEvent(QMouseEvent *event)
 				m_editor->seek(begin);
 				for (int i = 0; i < count; ++i)
 					m_editor->insertByte(value);
+				updateVisiblePage();
+				update();
 			}
 		} else if (a == &insertAfterAction) {
 			int count;
@@ -678,6 +697,8 @@ void HexViewInternal::mousePressEvent(QMouseEvent *event)
 				m_editor->seek(begin + count);
 				for (int i = 0; i < count; ++i)
 					m_editor->insertByte(value);
+				updateVisiblePage();
+				update();
 			}
 		}
 	} else {
@@ -794,6 +815,7 @@ void HexViewInternal::keyPressEvent(QKeyEvent *event)
 					++newSelection.begin;
 					setSelection(newSelection);
 				}
+				updateVisiblePage();
 				update();
 				return;
 			}
@@ -828,6 +850,7 @@ void HexViewInternal::keyPressEvent(QKeyEvent *event)
 					++newSelection.begin;
 					setSelection(newSelection);
 				}
+				updateVisiblePage();
 				update();
 				return;
 			}
@@ -835,8 +858,10 @@ void HexViewInternal::keyPressEvent(QKeyEvent *event)
 	}
 
 	if (movingKeys.contains(key)) {
-		if (m_editingCell)
+		if (m_editingCell) {
 			putByte();
+			updateVisiblePage();
+		}
 		int move = 0;
 		switch (key) {
 		case Qt::Key_Enter:
@@ -866,6 +891,7 @@ void HexViewInternal::keyPressEvent(QKeyEvent *event)
 			if (prevRowCount != rowCount())
 				emit rowCountChanged();
 		}
+		updateVisiblePage();
 		selectNone();
 		return;
 	}
