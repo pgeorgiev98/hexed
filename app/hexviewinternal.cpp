@@ -736,7 +736,7 @@ void HexViewInternal::mouseDoubleClickEvent(QMouseEvent *event)
 	if (hoverCellIndex != -1 || hoverTextIndex != -1) {
 		m_selecting = true;
 		m_selectingRows = true;
-		emit selectionChanged();
+		emit userChangedSelection();
 		update();
 	}
 }
@@ -814,6 +814,7 @@ void HexViewInternal::keyPressEvent(QKeyEvent *event)
 					ByteSelection newSelection = *m_selection;
 					++newSelection.begin;
 					setSelection(newSelection);
+					emit userChangedSelection();
 				}
 				updateVisiblePage();
 				update();
@@ -849,6 +850,7 @@ void HexViewInternal::keyPressEvent(QKeyEvent *event)
 					ByteSelection newSelection = *m_selection;
 					++newSelection.begin;
 					setSelection(newSelection);
+					emit userChangedSelection();
 				}
 				updateVisiblePage();
 				update();
@@ -878,6 +880,7 @@ void HexViewInternal::keyPressEvent(QKeyEvent *event)
 		ByteSelection newSelection = *m_selection;
 		newSelection.begin += move;
 		setSelection(newSelection);
+		userChangedSelection();
 		update();
 	} else if (key == Qt::Key_Delete || key == Qt::Key_Backspace) {
 		ByteSelection sel = *selection();
@@ -993,4 +996,6 @@ void HexViewInternal::updateVisiblePage()
 	m_editor->seek(startByte);
 	for (int i = 0; i < totalBytes; ++i)
 		m_visiblePage[i] = m_editor->getByte();
+
+	emit visiblePageChanged();
 }

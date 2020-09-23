@@ -51,6 +51,15 @@ void HexView::updateScrollMaximum()
 	m_verticalScrollBar->setMaximum(scrollMax / scrollStep(scrollMax) + 1);
 }
 
+void HexView::updateViews()
+{
+	HexViewInternal *source = qobject_cast<HexViewInternal *>(sender());
+
+	for (HexViewInternal *view : m_hexViews)
+		if (view != source)
+			view->update();
+}
+
 void HexView::setTopRow(qint64 topRow)
 {
 	m_verticalScrollBar->setValue(topRow / scrollStep(scrollMaximum()));
@@ -195,6 +204,7 @@ bool HexView::openFile(const QString &path)
 		connect(hexView, &HexViewInternal::scrollMaximumChanged, this, &HexView::updateScrollMaximum);
 		connect(hexView, &HexViewInternal::selectionChanged, this, &HexView::selectionChanged); // TODO: Deduplicate
 		connect(hexView, &HexViewInternal::userChangedSelection, this, &HexView::onUserChangedSelection);
+		connect(hexView, &HexViewInternal::visiblePageChanged, this, &HexView::updateViews);
 		updateStatusBar();
 	} else {
 		hexView->deleteLater();

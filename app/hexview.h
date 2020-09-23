@@ -48,6 +48,7 @@ signals:
 
 private slots:
 	void updateScrollMaximum();
+	void updateViews();
 	void setTopRow(qint64 topRow);
 	void onScrollBarChanged(int value);
 	void updateStatusBar();

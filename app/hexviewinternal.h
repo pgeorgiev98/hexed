@@ -54,6 +54,7 @@ signals:
 	void scrollMaximumChanged();
 	void userChangedSelection();
 	void selectionChanged();
+	void visiblePageChanged();
 
 private slots:
 	void setBytesPerLine(int bytesPerLine);
