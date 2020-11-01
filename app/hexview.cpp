@@ -19,6 +19,7 @@ HexView::HexView(QWidget *parent)
 	, m_statusBar(new QStatusBar)
 	, m_fileSizeLabel(new QLabel)
 	, m_selectionLabel(new QLabel)
+	, m_focusedViewIndex(0)
 {
 	m_statusBar->addPermanentWidget(m_selectionLabel, 1);
 	m_statusBar->addPermanentWidget(m_fileSizeLabel);
@@ -40,9 +41,7 @@ HexView::HexView(QWidget *parent)
 
 std::optional<ByteSelection> HexView::selection() const
 {
-	// TODO
-	return std::optional<ByteSelection>();
-	//return m_hexViewInternal->selection();
+	return hexViewInternal()->selection();
 }
 
 void HexView::updateScrollMaximum()
@@ -77,10 +76,10 @@ void HexView::onScrollBarChanged(int value)
 
 void HexView::updateStatusBar()
 {
-	// TODO
-	/*
+	HexViewInternal *v = hexViewInternal();
+
 	// File size
-	qint64 fileSize = m_hexViewInternal->editor()->size();
+	qint64 fileSize = v->editor()->size();
 	QString fileSizeString = "Total: ";
 	fileSizeString.append(QString("%1B").arg(fileSize));
 	if (fileSize >= 1024)
@@ -88,13 +87,13 @@ void HexView::updateStatusBar()
 	m_fileSizeLabel->setText(fileSizeString);
 
 	// Selection
-	auto selection = m_hexViewInternal->selection();
+	auto selection = v->selection();
 	QString selectionText;
 	if (selection) {
 		ByteSelection sel = *selection;
 
 		QByteArray bytes;
-		auto editor = m_hexViewInternal->editor();
+		auto editor = v->editor();
 		if (sel.count <= 4 && sel.begin != editor->size()) {
 			editor->seek(sel.begin);
 			for (int i = 0; i < sel.count; ++i)
@@ -103,18 +102,18 @@ void HexView::updateStatusBar()
 
 		if (sel.begin == editor->size()) {
 			selectionText = QString("Selected 0x%1")
-					.arg(sel.begin, m_hexViewInternal->lineNumberDigitsCount(), 16, QChar('0'));
+					.arg(sel.begin, v->lineNumberDigitsCount(), 16, QChar('0'));
 
 		} else if (sel.count == 1) {
 			selectionText = QString("Selected 0x%1, Dec: %2")
-					.arg(sel.begin, m_hexViewInternal->lineNumberDigitsCount(), 16, QChar('0'))
+					.arg(sel.begin, v->lineNumberDigitsCount(), 16, QChar('0'))
 					.arg(quint64(quint8(bytes[0])));
 
 		} else if (sel.count > 1) {
 			selectionText = QString("Selected %1 bytes (0x%2 to 0x%3)")
 					.arg(sel.count)
-					.arg(sel.begin, m_hexViewInternal->lineNumberDigitsCount(), 16, QChar('0'))
-					.arg(sel.begin + sel.count - 1, m_hexViewInternal->lineNumberDigitsCount(), 16, QChar('0'));
+					.arg(sel.begin, v->lineNumberDigitsCount(), 16, QChar('0'))
+					.arg(sel.begin + sel.count - 1, v->lineNumberDigitsCount(), 16, QChar('0'));
 
 			if (!bytes.isEmpty()) {
 				quint64 le = EndianConverter::littleEndianToNumber(bytes);
@@ -125,7 +124,6 @@ void HexView::updateStatusBar()
 		}
 	}
 	m_selectionLabel->setText(selectionText);
-	*/
 }
 
 void HexView::onUserChangedSelection()
@@ -145,6 +143,25 @@ void HexView::onUserChangedSelection()
 	}
 }
 
+void HexView::onViewFocusedSlot()
+{
+	HexViewInternal *view = qobject_cast<HexViewInternal *>(sender());
+	if (view) {
+		int index = m_hexViews.indexOf(view);
+		if (index != -1) {
+			m_focusedViewIndex = index;
+			onViewFocused();
+		}
+	}
+}
+
+void HexView::onViewFocused()
+{
+	HexViewInternal *v = hexViewInternal();
+	emit canUndoChanged(v->canUndo());
+	emit canRedoChanged(v->canRedo());
+}
+
 int HexView::scrollStep(qint64 rowCount) const
 {
 	const qint64 maxScrollValue = 2100000000;
@@ -161,26 +178,30 @@ qint64 HexView::scrollMaximum() const
 	return scrollMaximum;
 }
 
+HexViewInternal *HexView::hexViewInternal()
+{
+	return m_hexViews[m_focusedViewIndex];
+}
+
+const HexViewInternal *HexView::hexViewInternal() const
+{
+	return m_hexViews[m_focusedViewIndex];
+}
+
 
 bool HexView::canUndo() const
 {
-	// TODO
-	//return m_hexViewInternal->canUndo();
-	return false;
+	return hexViewInternal()->canUndo();
 }
 
 bool HexView::canRedo() const
 {
-	// TODO
-	//return m_hexViewInternal->canRedo();
-	return false;
+	return hexViewInternal()->canRedo();
 }
 
 BufferedEditor *HexView::editor()
 {
-	// TODO
-	//return m_hexViewInternal->editor();
-	return nullptr;
+	return hexViewInternal()->editor();
 }
 
 bool HexView::openFile(const QString &path)
@@ -205,6 +226,7 @@ bool HexView::openFile(const QString &path)
 		connect(hexView, &HexViewInternal::selectionChanged, this, &HexView::selectionChanged); // TODO: Deduplicate
 		connect(hexView, &HexViewInternal::userChangedSelection, this, &HexView::onUserChangedSelection);
 		connect(hexView, &HexViewInternal::visiblePageChanged, this, &HexView::updateViews);
+		connect(hexView, &HexViewInternal::focused, this, &HexView::onViewFocusedSlot);
 		updateStatusBar();
 	} else {
 		hexView->deleteLater();
@@ -215,9 +237,7 @@ bool HexView::openFile(const QString &path)
 
 bool HexView::saveChanges()
 {
-	// TODO
-	return false;
-	//return m_hexViewInternal->saveChanges();
+	return hexViewInternal()->canRedo();
 }
 
 bool HexView::quit()
@@ -231,52 +251,46 @@ bool HexView::quit()
 
 void HexView::undo()
 {
-	// TODO
-	//m_hexViewInternal->undo();
+	hexViewInternal()->undo();
 }
 
 void HexView::redo()
 {
-	// TODO
-	//m_hexViewInternal->redo();
+	hexViewInternal()->redo();
 }
 
 void HexView::selectAll()
 {
-	// TODO
-	//m_hexViewInternal->selectAll();
+	hexViewInternal()->selectAll();
 }
 
 void HexView::selectNone()
 {
-	// TODO
-	//m_hexViewInternal->selectNone();
+	hexViewInternal()->selectNone();
 }
 
 void HexView::copyText()
 {
-	// TODO
-	//ByteSelection selection = *m_hexViewInternal->selection();
-	//selection.type = ByteSelection::Type::Text;
-	//m_hexViewInternal->copy(selection);
+	HexViewInternal *v = hexViewInternal();
+	ByteSelection selection = *v->selection();
+	selection.type = ByteSelection::Type::Text;
+	v->copy(selection);
 }
 
 void HexView::copyHex()
 {
-	// TODO
-	//ByteSelection selection = *m_hexViewInternal->selection();
-	//selection.type = ByteSelection::Type::Cells;
-	//m_hexViewInternal->copy(selection);
+	HexViewInternal *v = hexViewInternal();
+	ByteSelection selection = *v->selection();
+	selection.type = ByteSelection::Type::Cells;
+	v->copy(selection);
 }
 
 void HexView::openGotoDialog()
 {
-	// TODO
-	//m_hexViewInternal->openGotoDialog();
+	hexViewInternal()->openGotoDialog();
 }
 
 void HexView::openFindDialog()
 {
-	// TODO
-	//m_hexViewInternal->openFindDialog();
+	hexViewInternal()->openFindDialog();
 }

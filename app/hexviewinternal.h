@@ -55,6 +55,7 @@ signals:
 	void userChangedSelection();
 	void selectionChanged();
 	void visiblePageChanged();
+	void focused();
 
 private slots:
 	void setBytesPerLine(int bytesPerLine);
@@ -86,6 +87,7 @@ protected:
 	void leaveEvent(QEvent *) override;
 	void wheelEvent(QWheelEvent *) override;
 	void keyPressEvent(QKeyEvent *) override;
+	void focusInEvent(QFocusEvent *event) override;
 
 private:
 	Mode m_mode;

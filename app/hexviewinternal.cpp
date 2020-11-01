@@ -902,6 +902,11 @@ void HexViewInternal::keyPressEvent(QKeyEvent *event)
 	QWidget::keyPressEvent(event);
 }
 
+void HexViewInternal::focusInEvent(QFocusEvent *)
+{
+	emit focused();
+}
+
 qint64 HexViewInternal::getHoverCell(const QPoint &mousePos) const
 {
 	if (cursorIsInFindWidget(mousePos))

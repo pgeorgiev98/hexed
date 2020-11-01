@@ -112,7 +112,11 @@ bool MainWindow::diffFiles(const QStringList &files)
 
 	if (ok) {
 		m_tabWidget->insertTab(m_tabWidget->count(), tab, files.join(" | "));
+		connect(tab, &HexView::canUndoChanged, this, &MainWindow::onCanUndoChanged);
+		connect(tab, &HexView::canRedoChanged, this, &MainWindow::onCanRedoChanged);
+		connect(tab, &HexView::selectionChanged, this, &MainWindow::onSelectionChanged);
 		m_tabWidget->setCurrentWidget(tab);
+		onTabCountChanged();
 	} else {
 		// TODO: proper cleanup
 	}

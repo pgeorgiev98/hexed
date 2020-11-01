@@ -53,9 +53,13 @@ private slots:
 	void onScrollBarChanged(int value);
 	void updateStatusBar();
 	void onUserChangedSelection();
+	void onViewFocusedSlot();
+	void onViewFocused();
 
 	int scrollStep(qint64 rowCount) const;
 	qint64 scrollMaximum() const;
+	HexViewInternal *hexViewInternal();
+	const HexViewInternal *hexViewInternal() const;
 
 private:
 	QVector<HexViewInternal *> m_hexViews;
@@ -64,6 +68,8 @@ private:
 	QStatusBar *m_statusBar;
 	QLabel *m_fileSizeLabel;
 	QLabel *m_selectionLabel;
+
+	int m_focusedViewIndex;
 };
 
 #endif // HEXVIEW_H
