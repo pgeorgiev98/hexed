@@ -18,6 +18,8 @@ MainWindow::MainWindow(QWidget *parent)
 	, m_editMenu(new QMenu("&Edit"))
 	, m_toolsMenu(new QMenu("&Tools"))
 	, m_openAction(new QAction("&Open"))
+	, m_diffFiles(new QAction("Compare files"))
+	, m_diffCurrentFile(new QAction("Compare current file"))
 	, m_saveAction(new QAction("&Save"))
 	, m_exitAction(new QAction("&Exit"))
 	, m_undoAction(new QAction("&Undo"))
@@ -48,6 +50,8 @@ MainWindow::MainWindow(QWidget *parent)
 	m_findAction->setShortcut(QKeySequence::Find);
 
 	m_fileMenu->addAction(m_openAction);
+	m_fileMenu->addAction(m_diffFiles);
+	m_fileMenu->addAction(m_diffCurrentFile);
 	m_fileMenu->addAction(m_saveAction);
 	m_fileMenu->addAction(m_exitAction);
 
@@ -70,6 +74,8 @@ MainWindow::MainWindow(QWidget *parent)
 	menuBar()->addMenu(m_toolsMenu);
 
 	connect(m_openAction, &QAction::triggered, this, &MainWindow::onOpenClicked);
+	connect(m_diffFiles, &QAction::triggered, this, qOverload<>(&MainWindow::diffFiles));
+	connect(m_diffCurrentFile, &QAction::triggered, this, &MainWindow::diffCurrentFile);
 	connect(m_saveAction, &QAction::triggered, this, &MainWindow::saveChanges);
 	connect(m_exitAction, &QAction::triggered, this, &MainWindow::onExitClicked);
 
@@ -134,6 +140,38 @@ void MainWindow::onOpenClicked()
 
 	QString filename = QFileDialog::getOpenFileName(this, "Open file", dir);
 	openFile(filename);
+}
+
+void MainWindow::diffFiles()
+{
+	// TODO: Remember the last opened directory
+	QStringList dirs = QStandardPaths::standardLocations(QStandardPaths::HomeLocation);
+	QString dir;
+	if (!dirs.isEmpty())
+		dir = dirs.first();
+
+	QStringList filenames = QFileDialog::getOpenFileNames(this, "Select files", dir);
+	if (!filenames.isEmpty())
+		diffFiles(filenames);
+}
+
+void MainWindow::diffCurrentFile()
+{
+	Q_ASSERT(m_tabWidget->count() > 0);
+
+	// TODO: Remember the last opened directory
+	QStringList dirs = QStandardPaths::standardLocations(QStandardPaths::HomeLocation);
+	QString dir;
+	if (!dirs.isEmpty())
+		dir = dirs.first();
+
+	QString filename = QFileDialog::getOpenFileName(this, "Select file", dir);
+	if (filename.isEmpty())
+		return;
+
+	HexView *tab = qobject_cast<HexView *>(m_tabWidget->currentWidget());
+	Q_ASSERT(tab);
+	tab->openFile(filename);
 }
 
 bool MainWindow::saveChanges()
@@ -232,6 +270,7 @@ void MainWindow::openBaseConverter()
 void MainWindow::onTabCountChanged()
 {
 	bool hasTabs = m_tabWidget->count() > 0;
+	m_diffCurrentFile->setEnabled(hasTabs);
 	m_saveAction->setEnabled(hasTabs);
 	m_gotoAction->setEnabled(hasTabs);
 	m_findAction->setEnabled(hasTabs);

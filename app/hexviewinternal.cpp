@@ -282,6 +282,7 @@ void HexViewInternal::setSelection(ByteSelection selection)
 void HexViewInternal::selectAll()
 {
 	highlight(ByteSelection(0, m_editor->size(), ByteSelection::Cells));
+	emit userChangedSelection();
 }
 
 void HexViewInternal::selectNone()
@@ -418,6 +419,7 @@ void HexViewInternal::openGotoDialog()
 
 	qint64 position = m_gotoDialog->position();
 	highlight(ByteSelection(position, 1));
+	emit userChangedSelection();
 
 	// TODO: Something smarter
 	setTopRow(position / m_bytesPerLine);

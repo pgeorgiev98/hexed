@@ -20,6 +20,8 @@ public slots:
 	bool diffFiles(const QStringList &files);
 
 	void onOpenClicked();
+	void diffFiles();
+	void diffCurrentFile();
 	bool saveChanges();
 	bool closeTab(int index);
 	void onExitClicked();
@@ -47,6 +49,8 @@ private:
 	QMenu *m_toolsMenu;
 
 	QAction *m_openAction;
+	QAction *m_diffFiles;
+	QAction *m_diffCurrentFile;
 	QAction *m_saveAction;
 	QAction *m_exitAction;
 

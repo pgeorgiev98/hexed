@@ -7,7 +7,14 @@ static QTextStream err(stderr);
 
 static void printUsage(const QStringList &args, QTextStream &out)
 {
-	out << "Usage: " << args[0] << " filename" << Qt::endl;
+	out << "Open files in tabs:" << Qt::endl
+		<< "\t" << args[0] << " file1 [file2] [file3] [...]" << Qt::endl
+		<< Qt::endl
+		<< "Diff files:" << Qt::endl
+		<< "\t" << args[0] << " --diff file1 [file2] [file3] [...]" << Qt::endl
+		<< Qt::endl
+		<< "Show this help message:" << Qt::endl
+		<< "\t" << args[0] << " --help" << Qt::endl;
 }
 
 int main(int argc, char *argv[])
@@ -21,18 +28,20 @@ int main(int argc, char *argv[])
 	}
 
 	MainWindow w;
-	if (a.arguments()[1] == "--diff") {
-		if (a.arguments().size() == 2) {
-			printUsage(a.arguments(), err);
-			return 1;
+	if (args.size() > 1) {
+		if (args[1] == "--diff") {
+			if (args.size() == 2) {
+				printUsage(args, err);
+				return 1;
+			}
+			QStringList files;
+			for (int i = 2; i < args.size(); ++i)
+				files << args[i];
+			w.diffFiles(files);
+		} else {
+			for (int i = 1; i < args.size(); ++i)
+				w.openFile(args[i]);
 		}
-		QStringList files;
-		for (int i = 2; i < a.arguments().size(); ++i)
-			files << a.arguments()[i];
-		w.diffFiles(files);
-	} else {
-		for (int i = 1; i < a.arguments().size(); ++i)
-			w.openFile(a.arguments()[i]);
 	}
 	w.show();
 
