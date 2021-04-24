@@ -21,6 +21,7 @@ SOURCES += \
         bufferededitor.cpp \
         byteinputwidget.cpp \
         common.cpp \
+        difffilesdialog.cpp \
         endianconverter.cpp \
         expressionvalidator.cpp \
         finder.cpp \
@@ -37,6 +38,7 @@ HEADERS += \
         bufferededitor.h \
         byteinputwidget.h \
         common.h \
+        difffilesdialog.h \
         endianconverter.h \
         expressionvalidator.h \
         finder.h \
@@ -45,7 +47,8 @@ HEADERS += \
         hexview.h \
         hexviewinternal.h \
         iconprovider.h \
-        mainwindow.h
+        mainwindow.h \
+        utilities.h
 
 RESOURCES += res/resources.qrc
 

@@ -1,6 +1,8 @@
 #include "mainwindow.h"
+#include "utilities.h"
 #include "hexview.h"
 #include "baseconverter.h"
+#include "difffilesdialog.h"
 #include "bufferededitor.h"
 
 #include <QMessageBox>
@@ -8,8 +10,6 @@
 #include <QMenu>
 #include <QAction>
 #include <QTabWidget>
-#include <QFileDialog>
-#include <QStandardPaths>
 
 MainWindow::MainWindow(QWidget *parent)
 	: QMainWindow(parent)
@@ -132,40 +132,26 @@ bool MainWindow::diffFiles(const QStringList &files)
 
 void MainWindow::onOpenClicked()
 {
-	// TODO: Remember the last opened directory
-	QStringList dirs = QStandardPaths::standardLocations(QStandardPaths::HomeLocation);
-	QString dir;
-	if (!dirs.isEmpty())
-		dir = dirs.first();
-
-	QString filename = QFileDialog::getOpenFileName(this, "Open file", dir);
-	openFile(filename);
+	QString filename = selectFile(this);
+	if (!filename.isEmpty())
+		openFile(filename);
 }
 
 void MainWindow::diffFiles()
 {
-	// TODO: Remember the last opened directory
-	QStringList dirs = QStandardPaths::standardLocations(QStandardPaths::HomeLocation);
-	QString dir;
-	if (!dirs.isEmpty())
-		dir = dirs.first();
+	DiffFilesDialog dialog(this);
 
-	QStringList filenames = QFileDialog::getOpenFileNames(this, "Select files", dir);
-	if (!filenames.isEmpty())
-		diffFiles(filenames);
+	if (!dialog.exec())
+		return;
+
+	diffFiles(dialog.selectedFiles());
 }
 
 void MainWindow::diffCurrentFile()
 {
 	Q_ASSERT(m_tabWidget->count() > 0);
 
-	// TODO: Remember the last opened directory
-	QStringList dirs = QStandardPaths::standardLocations(QStandardPaths::HomeLocation);
-	QString dir;
-	if (!dirs.isEmpty())
-		dir = dirs.first();
-
-	QString filename = QFileDialog::getOpenFileName(this, "Select file", dir);
+	QString filename = selectFile(this);
 	if (filename.isEmpty())
 		return;
 
