@@ -9,6 +9,7 @@
 #include <QLabel>
 #include <QScrollBar>
 #include <QStatusBar>
+#include <QScrollArea>
 
 // TODO: Optionally don't scroll in real time while the scrollbar is being dragged
 
@@ -54,9 +55,9 @@ void HexView::updateViews()
 {
 	HexViewInternal *source = qobject_cast<HexViewInternal *>(sender());
 
-	for (HexViewInternal *view : m_hexViews)
-		if (view != source)
-			view->update();
+	for (auto p : m_hexViews)
+		if (p.first != source)
+			p.first->update();
 }
 
 void HexView::setTopRow(qint64 topRow)
@@ -70,8 +71,8 @@ void HexView::onScrollBarChanged(int value)
 	qint64 topRow = qint64(value) * scrollStep(scrollMax);
 	if (topRow > scrollMax)
 		topRow = scrollMax;
-	for (auto h : m_hexViews)
-		h->setTopRow(topRow);
+	for (auto p : m_hexViews)
+		p.first->setTopRow(topRow);
 }
 
 void HexView::updateStatusBar()
@@ -133,12 +134,12 @@ void HexView::onUserChangedSelection()
 	HexViewInternal *hexView = qobject_cast<HexViewInternal *>(sender());
 	Q_ASSERT(hexView);
 	auto selection = hexView->selection();
-	for (auto h : m_hexViews) {
-		if (h != hexView) {
+	for (auto p : m_hexViews) {
+		if (p.first != hexView) {
 			if (selection)
-				h->highlight(*selection);
+				p.first->highlight(*selection);
 			else
-				h->selectNone();
+				p.first->selectNone();
 		}
 	}
 }
@@ -147,10 +148,11 @@ void HexView::onViewFocusedSlot()
 {
 	HexViewInternal *view = qobject_cast<HexViewInternal *>(sender());
 	if (view) {
-		int index = m_hexViews.indexOf(view);
-		if (index != -1) {
-			m_focusedViewIndex = index;
-			onViewFocused();
+		for (int i = 0; i < m_hexViews.size(); ++i) {
+			if (m_hexViews[i].first == view) {
+				m_focusedViewIndex = i;
+				onViewFocused();
+			}
 		}
 	}
 }
@@ -160,6 +162,14 @@ void HexView::onViewFocused()
 	HexViewInternal *v = hexViewInternal();
 	emit canUndoChanged(v->canUndo());
 	emit canRedoChanged(v->canRedo());
+}
+
+void HexView::onHorizontalSliderMoved(int position)
+{
+	QScrollBar *scrollBar = qobject_cast<QScrollBar *>(sender());
+	if (scrollBar && scrollBar->hasTracking())
+		for (auto p : m_hexViews)
+			p.second->horizontalScrollBar()->setValue(position);
 }
 
 int HexView::scrollStep(qint64 rowCount) const
@@ -173,19 +183,19 @@ int HexView::scrollStep(qint64 rowCount) const
 qint64 HexView::scrollMaximum() const
 {
 	qint64 scrollMaximum = 0;
-	for (auto h : m_hexViews)
-		scrollMaximum = qMax(scrollMaximum, h->scrollMaximum());
+	for (auto p : m_hexViews)
+		scrollMaximum = qMax(scrollMaximum, p.first->scrollMaximum());
 	return scrollMaximum;
 }
 
 HexViewInternal *HexView::hexViewInternal()
 {
-	return m_hexViews[m_focusedViewIndex];
+	return m_hexViews[m_focusedViewIndex].first;
 }
 
 const HexViewInternal *HexView::hexViewInternal() const
 {
-	return m_hexViews[m_focusedViewIndex];
+	return m_hexViews[m_focusedViewIndex].first;
 }
 
 
@@ -210,10 +220,18 @@ bool HexView::openFile(const QString &path)
 	bool result = hexView->openFile(path);
 
 	if (result) {
-		m_hexViewsLayout->addWidget(hexView);
-		m_hexViews.append(hexView);
-		for (auto h : m_hexViews)
-			h->setDiffGroup(m_hexViews);
+		QScrollArea *area = new QScrollArea;
+		area->setVerticalScrollBarPolicy(Qt::ScrollBarPolicy::ScrollBarAlwaysOff);
+		area->setWidget(hexView);
+		m_hexViewsLayout->addWidget(area);
+		m_hexViews.append({hexView, area});
+
+		QVector<HexViewInternal *> hexViews;
+		hexViews.reserve(m_hexViews.size());
+		for (auto p : m_hexViews)
+			hexViews.append(p.first);
+		for (auto h : hexViews)
+			h->setDiffGroup(hexViews);
 
 		BufferedEditor *editor = hexView->editor();
 		connect(editor, &BufferedEditor::sizeChanged, this, &HexView::updateStatusBar);
@@ -227,6 +245,7 @@ bool HexView::openFile(const QString &path)
 		connect(hexView, &HexViewInternal::userChangedSelection, this, &HexView::onUserChangedSelection);
 		connect(hexView, &HexViewInternal::visiblePageChanged, this, &HexView::updateViews);
 		connect(hexView, &HexViewInternal::focused, this, &HexView::onViewFocusedSlot);
+		connect(area->horizontalScrollBar(), &QScrollBar::valueChanged, this, &HexView::onHorizontalSliderMoved);
 		updateStatusBar();
 	} else {
 		hexView->deleteLater();
@@ -244,8 +263,8 @@ bool HexView::quit()
 {
 	// TODO
 	bool ok = true;
-	for (auto h : m_hexViews)
-		ok &= h->quit();
+	for (auto p : m_hexViews)
+		ok &= p.first->quit();
 	return ok;
 }
 

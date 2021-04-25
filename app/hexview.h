@@ -13,6 +13,7 @@ class BufferedEditor;
 
 class QHBoxLayout;
 class QScrollBar;
+class QScrollArea;
 class QStatusBar;
 class QLabel;
 
@@ -55,6 +56,7 @@ private slots:
 	void onUserChangedSelection();
 	void onViewFocusedSlot();
 	void onViewFocused();
+	void onHorizontalSliderMoved(int position);
 
 	int scrollStep(qint64 rowCount) const;
 	qint64 scrollMaximum() const;
@@ -62,7 +64,7 @@ private slots:
 	const HexViewInternal *hexViewInternal() const;
 
 private:
-	QVector<HexViewInternal *> m_hexViews;
+	QVector<QPair<HexViewInternal *, QScrollArea *>> m_hexViews;
 	QHBoxLayout *m_hexViewsLayout;
 	QScrollBar *m_verticalScrollBar;
 	QStatusBar *m_statusBar;
