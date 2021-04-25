@@ -26,11 +26,13 @@ HexView::HexView(QWidget *parent)
 	m_statusBar->addPermanentWidget(m_fileSizeLabel);
 
 	QHBoxLayout *hbox = new QHBoxLayout;
+	hbox->setSpacing(0);
 	hbox->setContentsMargins(0, 0, 0, 0);
 	hbox->addLayout(m_hexViewsLayout);
 	hbox->addWidget(m_verticalScrollBar, 0, Qt::AlignRight);
 
 	QVBoxLayout *vbox = new QVBoxLayout;
+	vbox->setSpacing(0);
 	vbox->setContentsMargins(0, 0, 0, 0);
 	vbox->addLayout(hbox, 1);
 	vbox->addWidget(m_statusBar, 0, Qt::AlignBottom);
@@ -212,6 +214,17 @@ bool HexView::canRedo() const
 BufferedEditor *HexView::editor()
 {
 	return hexViewInternal()->editor();
+}
+
+int HexView::optimalWidth() const
+{
+	auto margins = contentsMargins();
+	int result = m_verticalScrollBar->width() + margins.left() + margins.right();
+	for (auto p : m_hexViews) {
+		auto margins = p.second->contentsMargins();
+		result += p.second->widget()->width() + margins.left() + margins.right();
+	}
+	return result;
 }
 
 bool HexView::openFile(const QString &path)

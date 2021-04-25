@@ -29,6 +29,7 @@ public slots:
 	bool canUndo() const;
 	bool canRedo() const;
 	BufferedEditor *editor();
+	int optimalWidth() const;
 
 	bool openFile(const QString &path);
 	bool saveChanges();

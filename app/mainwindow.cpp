@@ -10,6 +10,7 @@
 #include <QMenu>
 #include <QAction>
 #include <QTabWidget>
+#include <QScreen>
 
 MainWindow::MainWindow(QWidget *parent)
 	: QMainWindow(parent)
@@ -93,7 +94,7 @@ MainWindow::MainWindow(QWidget *parent)
 	onTabCountChanged();
 }
 
-bool MainWindow::openFile(const QString &path)
+bool MainWindow::openFile(const QString &path, bool resizeWidth)
 {
 	HexView *tab = new HexView;
 	bool ok = tab->openFile(path);
@@ -104,11 +105,13 @@ bool MainWindow::openFile(const QString &path)
 		connect(tab, &HexView::selectionChanged, this, &MainWindow::onSelectionChanged);
 		m_tabWidget->setCurrentWidget(tab);
 		onTabCountChanged();
+		if (resizeWidth)
+			updateWindowWidth();
 	}
 	return ok;
 }
 
-bool MainWindow::diffFiles(const QStringList &files)
+bool MainWindow::diffFiles(const QStringList &files, bool resizeWidth)
 {
 	HexView *tab = new HexView;
 
@@ -123,6 +126,8 @@ bool MainWindow::diffFiles(const QStringList &files)
 		connect(tab, &HexView::selectionChanged, this, &MainWindow::onSelectionChanged);
 		m_tabWidget->setCurrentWidget(tab);
 		onTabCountChanged();
+		if (resizeWidth)
+			updateWindowWidth();
 	} else {
 		// TODO: proper cleanup
 	}
@@ -250,6 +255,18 @@ void MainWindow::openBaseConverter()
 	m_baseConverter->show();
 	m_baseConverter->activateWindow();
 	m_baseConverter->raise();
+}
+
+void MainWindow::updateWindowWidth()
+{
+	int screenWidth = window()->screen()->size().width();
+	int optimalWidth = 0;
+	for (int i = 0; i < m_tabWidget->count(); ++i) {
+		HexView *tab = static_cast<HexView *>(m_tabWidget->widget(i));
+		optimalWidth = qMax(optimalWidth, tab->optimalWidth() + 10);
+	}
+	int newWidth = qMin(screenWidth, optimalWidth);
+	resize(newWidth, height());
 }
 
 

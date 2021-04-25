@@ -16,8 +16,8 @@ public:
 	explicit MainWindow(QWidget *parent = nullptr);
 
 public slots:
-	bool openFile(const QString &path);
-	bool diffFiles(const QStringList &files);
+	bool openFile(const QString &path, bool resizeWidth = false);
+	bool diffFiles(const QStringList &files, bool resizeWidth = false);
 
 	void onOpenClicked();
 	void diffFiles();
@@ -34,6 +34,7 @@ public slots:
 	void openGotoDialog();
 	void openFindDialog();
 	void openBaseConverter();
+	void updateWindowWidth();
 
 private slots:
 	void onTabCountChanged();

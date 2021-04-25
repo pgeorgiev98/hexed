@@ -37,10 +37,10 @@ int main(int argc, char *argv[])
 			QStringList files;
 			for (int i = 2; i < args.size(); ++i)
 				files << args[i];
-			w.diffFiles(files);
+			w.diffFiles(files, true);
 		} else {
 			for (int i = 1; i < args.size(); ++i)
-				w.openFile(args[i]);
+				w.openFile(args[i], true);
 		}
 	}
 	w.show();
