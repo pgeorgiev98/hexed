@@ -11,8 +11,6 @@
 #include <QStatusBar>
 #include <QScrollArea>
 
-// TODO: Optionally don't scroll in real time while the scrollbar is being dragged
-
 HexView::HexView(QWidget *parent)
 	: QWidget(parent)
 	, m_hexViewsLayout(new QHBoxLayout)
@@ -39,7 +37,7 @@ HexView::HexView(QWidget *parent)
 
 	setLayout(vbox);
 
-	connect(m_verticalScrollBar, &QScrollBar::valueChanged, this, &HexView::onScrollBarChanged);
+	connect(m_verticalScrollBar, &QScrollBar::sliderReleased, this, &HexView::onScrollBarChanged);
 }
 
 std::optional<ByteSelection> HexView::selection() const
@@ -67,8 +65,9 @@ void HexView::setTopRow(qint64 topRow)
 	m_verticalScrollBar->setValue(topRow / scrollStep(scrollMaximum()));
 }
 
-void HexView::onScrollBarChanged(int value)
+void HexView::onScrollBarChanged()
 {
+	int value = m_verticalScrollBar->value();
 	qint64 scrollMax = scrollMaximum();
 	qint64 topRow = qint64(value) * scrollStep(scrollMax);
 	if (topRow > scrollMax)

@@ -52,7 +52,7 @@ private slots:
 	void updateScrollMaximum();
 	void updateViews();
 	void setTopRow(qint64 topRow);
-	void onScrollBarChanged(int value);
+	void onScrollBarChanged();
 	void updateStatusBar();
 	void onUserChangedSelection();
 	void onViewFocusedSlot();
