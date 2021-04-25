@@ -234,6 +234,7 @@ bool HexView::openFile(const QString &path)
 
 	if (result) {
 		QScrollArea *area = new QScrollArea;
+		area->setWidgetResizable(true);
 		area->setVerticalScrollBarPolicy(Qt::ScrollBarPolicy::ScrollBarAlwaysOff);
 		area->setWidget(hexView);
 		m_hexViewsLayout->addWidget(area);
