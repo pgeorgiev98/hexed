@@ -5,6 +5,7 @@
 #include <QVector>
 
 #include <variant>
+#include <optional>
 
 class QFileDevice;
 

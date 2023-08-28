@@ -5,14 +5,13 @@
 
 static void printUsage(const QStringList &args, QTextStream &out)
 {
-	out << "Usage: " << args[0] << " filename" << endl;
+	out << "Usage: " << args[0] << " filename" << Qt::endl;
 }
 
 static QTextStream out(stdout);
 
 int main(int argc, char *argv[])
 {
-	qsrand(QDateTime::currentDateTime().toMSecsSinceEpoch());
 	QApplication a(argc, argv);
 
 	const auto &args = a.arguments();
@@ -22,8 +21,8 @@ int main(int argc, char *argv[])
 	}
 
 	MainWindow w;
-	for (int i = 1; i < a.arguments().size(); ++i)
-		w.openFile(a.arguments()[i]);
+	for (int i = 1; i < args.size(); ++i)
+		w.openFile(args[i]);
 	w.show();
 
 	return a.exec();

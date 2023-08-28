@@ -78,7 +78,8 @@ void FindWidget::close()
 QByteArray FindWidget::searchData() const
 {
 	QByteArray arr;
-	for (const QString &s : m_input->text().split(' ', QString::SkipEmptyParts))
+	QStringList parts = m_input->text().split(' ', Qt::SkipEmptyParts);
+	for (const QString &s : parts)
 		arr.append(s.toInt(nullptr, 16));
 	return arr;
 }
@@ -100,11 +101,7 @@ void FindWidget::focusInEvent(QFocusEvent *)
 
 void FindWidget::showEvent(QShowEvent *)
 {
-	QString placeholder;
-	for (int i = 0; i < 5; ++i)
-		placeholder.append(QString("%1 ").arg(qrand() % 256, 2, 16, QChar('0')));
-	placeholder.append("...");
-	m_input->setPlaceholderText(placeholder);
+	m_input->setPlaceholderText("DE 3E 99 0B F5 ...");
 }
 
 void FindWidget::searchDown()
